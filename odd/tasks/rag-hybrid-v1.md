@@ -12,13 +12,13 @@ Haystack 2.x + Qdrant hybrid pipeline (BGE-M3 dense + BM25 sparse, RRF, BGE-rera
 
 ## Tasks
 
-- T1 — Scaffold: branch `feat/v1-scaffold`, uv project (src layout), torch CPU index, `.env.example`, `.gitignore`, `docker-compose.yml` (Qdrant, bind mount `./.qdrant_storage`) — S2, S3
-- T2 — `config.py` (pydantic-settings, env-driven; `HF_HOME=./.models`) + `store.py` (QdrantDocumentStore factory with sparse support) — S1, S2
-- T3 — `indexing.py`: ingest → chunk → BGE-M3 dense embed + BM25 sparse embed → Qdrant writer — S1
-- T4 — `retrieval.py`: hybrid retrieve → RRF → BGE-reranker-v2-m3 → prompt → DeepSeek (OpenAI-compatible) → answer — S1, S5
-- T5 — `cli.py`: `rag-hybrid index <path>` / `rag-hybrid retrieve <q>` / `rag-hybrid ask <q>` — S1
-- T6 — tests (config + pipeline wiring with fake components) + `evals/` DeepEval harness + golden-set stub — S4
-- T7 — README quickstart + end-to-end smoke (Docker Qdrant up, index `sample/`, retrieve without LLM key; `ask` requires `DEEPSEEK_API_KEY`) — all
+- T1 — Scaffold: branch `feat/v1-scaffold`, uv project (src layout), torch CPU index, `.env.example`, `.gitignore`, `docker-compose.yml` (Qdrant, bind mount `./.qdrant_storage`) — S2, S3 — **done, commit d24eb52**
+- T2 — `config.py` (pydantic-settings, env-driven; `HF_HOME=./.models`) + `store.py` (QdrantDocumentStore factory with sparse support) + `sparse.py` (BM25 hashed sparse embedder) — S1, S2 — **done, commit d24eb52**
+- T3 — `indexing.py`: ingest → chunk → BGE-M3 dense embed + BM25 sparse embed → Qdrant writer — S1 — **done, commit fcd6346**
+- T4 — `retrieval.py`: hybrid retrieve → RRF (server-side) → BGE-reranker-v2-m3 → prompt → DeepSeek (OpenAI-compatible) → answer — S1, S5 — **done, commit fcd6346**
+- T5 — `cli.py`: `rag-hybrid index <path>` / `rag-hybrid retrieve <q>` / `rag-hybrid ask <q>` — S1 — **done, commit fcd6346**
+- T6 — tests (config + pipeline wiring) + `evals/` DeepEval harness + golden-set stub — S4 — **done (17/17 unit tests green), commit cfb8297**
+- T7 — README quickstart + end-to-end smoke (Docker Qdrant up, index `sample/`, retrieve without LLM key; `ask` requires `DEEPSEEK_API_KEY`) — all — **done, commit 3e05dd9** (SMOKE-OK: 2 files -> 2 chunks indexed, collection `text-dense` 1024/cosine + `text-sparse` modifier `idf`, semantic retrieve 0.972/0.983, keyword retrieve 0.955 on the right doc; `ask` leg built and unit-verified, full run pending the user's DEEPSEEK_API_KEY)
 
 ## Log
 
@@ -28,3 +28,9 @@ Haystack 2.x + Qdrant hybrid pipeline (BGE-M3 dense + BM25 sparse, RRF, BGE-rera
 - L4 (2026-11-13): proposal to scaffold v1 (Haystack 2.x + Qdrant hybrid pipeline + DeepEval day one) → user: "si dale"
 - L5 (2026-11-13, user): "ah oye vas a usar docker para no ensuciar mi maquina cierto?" → isolation plan confirmed: Docker Qdrant + project-contained venv/models/data; cleanup = `docker compose down -v` + delete folder.
 - L6 (2026-11-13, user): "vamos a usar deepseek" → S5.
+- L7 (2026-11-13, verification): resolved against installed versions — haystack-ai 2.31.1, qdrant-haystack 7.0.0 (namespace `haystack_integrations`), sentence-transformers 6.3, deepeval 4.3.4. RRF is server-side inside `QdrantHybridRetriever` (`FusionQuery(RRF)` over dense+sparse prefetches); `sparse_idf=True` only sets Qdrant's `Modifier.IDF`, so the client supplies both embeddings → custom BM25 hashed sparse components (no fastembed dependency).
+- L8 (2026-11-13, fixes from the wiring-test cycle): added `accelerate` + `sentencepiece` deps (ranker optional deps); ST embedders imported from `sentence-transformers-haystack` (core ones deprecated for 3.0); ranker swapped to `SentenceTransformersSimilarityRanker` (TransformersSimilarityRanker is legacy); `PromptBuilder` got `required_variables`; pipeline graph is a networkx MultiDiGraph (3-tuple edges).
+- L9 (2026-11-13, E2E incident): index failed with `Unknown arguments: ['init_from']` — qdrant-client 1.19/1.20 removed the `init_from` param and assert-reject unknown kwargs locally; qdrant-haystack 7.0 still passes it. Fix (commit 3e05dd9): pin `qdrant-client>=1.12,<1.15` (1.14.3 resolved) + server image `v1.14.1` (same minor line; newer servers also warn on gap). Second incident in the same fix: bind-mount files were root-owned (breaks the rm -rf isolation promise) -> container now runs as 1000:1000 with `QDRANT__STORAGE__SNAPSHOTS_PATH` redirected into the mounted storage (image's ./snapshots is root-owned and panics otherwise).
+- L10 (2026-11-13, post-smoke polish, commit 3e05dd9): BM25 document embedder switched to `dataclasses.replace` (in-place mutation warned); ranker import moved to `haystack_integrations.components.rankers.sentence_transformers`. Final checks: 17/17 pytest green, retrieve re-verified (0.983).
+
+Risk: none (greenfield project: all code is new, no pre-existing behavior modified; verified by 17 unit tests + full E2E smoke).

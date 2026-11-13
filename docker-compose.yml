@@ -1,0 +1,12 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-hybrid-qdrant
+    ports:
+      - "6333:6333" # HTTP
+      - "6334:6334" # gRPC
+    volumes:
+      # Everything stays inside the project folder: delete the repo (plus
+      # `docker compose down -v` / `docker image rm`) and the machine is clean.
+      - ./.qdrant_storage:/qdrant/storage
+    restart: unless-stopped

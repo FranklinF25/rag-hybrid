@@ -1,0 +1,18 @@
+# Local Pi runtime state
+.atl/
+
+# Project-contained runtime state (delete the folder to wipe everything)
+.venv/
+.models/
+.qdrant_storage/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Secrets / local config
+.env

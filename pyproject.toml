@@ -1,0 +1,48 @@
+[project]
+name = "rag-hybrid"
+version = "0.1.0"
+description = "Semi-local hybrid RAG: Haystack 2.x + Qdrant + BGE-M3 dense/BM25 sparse + RRF + BGE-reranker-v2-m3 + DeepSeek"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "haystack-ai>=2.6,<3",
+    "qdrant-haystack>=5,<8",
+    "qdrant-client>=1.12",
+    "sentence-transformers>=3",
+    "sentence-transformers-haystack",
+    "accelerate",
+    "sentencepiece",
+    "openai>=1.50",
+    "pydantic-settings>=2.5",
+]
+
+[project.scripts]
+rag-hybrid = "rag_hybrid.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+eval = ["deepeval>=2"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rag_hybrid"]
+
+[tool.uv]
+default-groups = ["dev", "eval"]
+# CPU-only torch wheels: the semi-local budget is ~8GB RAM, no GPU.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "eval: DeepEval RAG metrics (need running Qdrant, downloaded models and DEEPSEEK_API_KEY)",
+]

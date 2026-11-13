@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "haystack-ai>=2.6,<3",
     "qdrant-haystack>=5,<8",
-    "qdrant-client>=1.12",
+    "qdrant-client>=1.12,<1.15",  # last line with init_from in create_collection; qdrant-haystack 7.0 passes it
     "sentence-transformers>=3",
     "sentence-transformers-haystack",
     "accelerate",

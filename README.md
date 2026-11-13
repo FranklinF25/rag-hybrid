@@ -35,7 +35,17 @@ rag-hybrid retrieve "What models run on CPU?"
 First run downloads the models (~4.5 GB total) into `./.models` — BGE-M3
 (~2.2 GB) and BGE-reranker-v2-m3 (~2.2 GB). Nothing is written outside the
 project folder; `docker compose down -v` plus deleting the repo leaves the
-machine exactly as it was.
+machine exactly as it was. Qdrant runs as your host user, so every file it
+writes stays deletable without sudo.
+
+## Version pins (important)
+
+`qdrant-client` is pinned `>=1.12,<1.15` and the compose image to
+`v1.14.1`: qdrant-haystack 7.0 still passes `init_from` to
+`create_collection`, which newer clients (>=1.15/1.20) reject with
+`Unknown arguments: ['init_from']`, and the client warns on minor-version
+gaps larger than 1 against the server. Keep client and server on the same
+minor line until the integration drops `init_from`.
 
 ## Evaluation
 

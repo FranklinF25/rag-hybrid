@@ -16,11 +16,13 @@ from __future__ import annotations
 from haystack import Pipeline
 from haystack.components.builders import AnswerBuilder, PromptBuilder
 from haystack.components.generators import OpenAIGenerator
-from haystack.components.rankers import SentenceTransformersSimilarityRanker
 from haystack.dataclasses import Answer, Document
 from haystack.utils import ComponentDevice, Secret
 from haystack_integrations.components.embedders.sentence_transformers import (
     SentenceTransformersTextEmbedder,
+)
+from haystack_integrations.components.rankers.sentence_transformers import (
+    SentenceTransformersSimilarityRanker,
 )
 from haystack_integrations.components.retrievers.qdrant import QdrantHybridRetriever
 

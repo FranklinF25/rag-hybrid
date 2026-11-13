@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from dataclasses import replace
 from hashlib import md5
 from typing import List
 
@@ -66,6 +67,11 @@ class BM25SparseDocumentEmbedder:
 
     @component.output_types(documents=List[Document])
     def run(self, documents: List[Document]):
-        for document in documents:
-            document.sparse_embedding = bm25_sparse_embedding(document.content or "")
-        return {"documents": documents}
+        # dataclasses.replace (not in-place mutation): Haystack requirement for
+        # custom components so no other pipeline stage sees surprising edits.
+        return {
+            "documents": [
+                replace(document, sparse_embedding=bm25_sparse_embedding(document.content or ""))
+                for document in documents
+            ]
+        }

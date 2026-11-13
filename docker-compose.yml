@@ -1,6 +1,9 @@
 services:
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.14.1  # aligned with qdrant-client 1.14.x (see pyproject)
+    # Run as the host user so bind-mount files stay deletable without sudo
+    # (isolation contract S2).
+    user: "1000:1000"
     container_name: rag-hybrid-qdrant
     ports:
       - "6333:6333" # HTTP
@@ -9,4 +12,8 @@ services:
       # Everything stays inside the project folder: delete the repo (plus
       # `docker compose down -v` / `docker image rm`) and the machine is clean.
       - ./.qdrant_storage:/qdrant/storage
+    environment:
+      # Running as a non-root user cannot write the image's ./snapshots;
+      # keep snapshots inside the bind-mounted storage dir.
+      QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/storage/snapshots
     restart: unless-stopped

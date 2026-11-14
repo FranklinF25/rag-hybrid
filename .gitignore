@@ -1,6 +1,10 @@
 # Local Pi runtime state
 .atl/
 
+# Local tools (installed but never committed — e.g. Archify)
+.tools/
+.archify/
+
 # Project-contained runtime state (delete the folder to wipe everything)
 .venv/
 .models/

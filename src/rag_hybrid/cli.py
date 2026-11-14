@@ -78,10 +78,26 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from .webapp import create_app
+
+    settings = get_settings()
+    uvicorn.run(
+        create_app(),
+        host=args.host or settings.web_host,
+        port=args.port or settings.web_port,
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rag-hybrid",
-        description="Semi-local hybrid RAG: Qdrant + BGE-M3 + BM25 + RRF + BGE-reranker + DeepSeek",
+        description=(
+            "Hybrid RAG: Qdrant + OpenRouter embeddings/rerank + local BM25 + RRF + DeepSeek"
+        ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -101,6 +117,20 @@ def build_parser() -> argparse.ArgumentParser:
     ask_parser = subparsers.add_parser("ask", help="Full RAG answer via DeepSeek")
     ask_parser.add_argument("query", help="Question to answer")
     ask_parser.set_defaults(func=cmd_ask)
+
+    serve_parser = subparsers.add_parser("serve", help="Launch the local web UI (chat + upload)")
+    serve_parser.add_argument(
+        "--host",
+        default=None,
+        help=f"Bind address (default: {get_settings().web_host})",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help=f"Bind port (default: {get_settings().web_port})",
+    )
+    serve_parser.set_defaults(func=cmd_serve)
 
     return parser
 

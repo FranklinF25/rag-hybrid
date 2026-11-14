@@ -17,15 +17,17 @@ def _fresh_settings_cache():
 
 def test_defaults_match_the_researched_stack():
     settings = Settings()
-    assert settings.embed_model == "BAAI/bge-m3"
-    assert settings.embed_dim == 1024
-    assert settings.reranker_model == "BAAI/bge-reranker-v2-m3"
+    assert settings.embed_model == "qwen/qwen3-embedding-8b"
+    assert settings.embed_dim == 4096
+    assert settings.embed_batch_size == 32
+    assert settings.reranker_model == "mongodb/rerank-3-lite"
+    assert settings.openrouter_base_url == "https://openrouter.ai/api/v1"
     assert settings.llm_base_url == "https://api.deepseek.com/v1"
     assert settings.llm_model == "deepseek-chat"
-    assert settings.device == "cpu"
     assert settings.chunk_split_by == "word"
     assert settings.retrieval_top_k == 20
     assert settings.rerank_top_k == 5
+    assert not hasattr(settings, "device")  # no local ML models remain
 
 
 def test_env_overrides_take_effect(monkeypatch):

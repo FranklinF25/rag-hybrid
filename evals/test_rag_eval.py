@@ -12,10 +12,11 @@ Thresholds follow the research baseline: faithfulness >= 0.85 and
 contextual precision >= 0.75 are pinned; contextual recall and answer
 relevancy use 0.70 as v1 starting points.
 
-Memory note: the single module-scoped query pipeline loads BGE-M3 and the
-reranker once (~4.4 GB); each golden question reuses it. The retrieval
-context is taken from the same run (the reranked documents), so no second
-pipeline is built.
+All models are stateless API clients (Qwen3 embeddings and rerank-3-lite
+via OpenRouter, DeepSeek for generation): the single module-scoped query
+pipeline holds no local weights; each golden question reuses it. The
+retrieval context is taken from the same run (the reranked documents), so
+no second pipeline is built.
 """
 
 from __future__ import annotations

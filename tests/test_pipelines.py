@@ -78,6 +78,9 @@ def test_query_pipeline_wiring(monkeypatch):
         ("bm25_query_embedder", "hybrid_retriever"),
         ("hybrid_retriever", "ranker"),
         ("ranker", "prompt_builder"),
+        # ranker also feeds answer_builder so the source documents travel on
+        # the Answer (run() only returns leaf outputs).
+        ("ranker", "answer_builder"),
         ("prompt_builder", "llm"),
         ("llm", "answer_builder"),
     }

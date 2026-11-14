@@ -6,12 +6,9 @@ from haystack import Pipeline
 from haystack.components.preprocessors import DocumentSplitter
 from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
-from haystack.utils import ComponentDevice
-from haystack_integrations.components.embedders.sentence_transformers import (
-    SentenceTransformersDocumentEmbedder,
-)
 
 from .config import Settings, get_settings
+from .openrouter import OpenRouterDocumentEmbedder
 from .sparse import BM25SparseDocumentEmbedder
 from .store import get_document_store
 
@@ -19,9 +16,10 @@ from .store import get_document_store
 def build_indexing_pipeline(settings: Settings | None = None, *, recreate_index: bool = False) -> Pipeline:
     """Wire the indexing pipeline.
 
-    The dense embedder (BGE-M3) loads lazily on ``warm_up()`` / first run,
-    so building the pipeline is cheap and offline. The BM25 sparse embedder
-    is pure Python and adds no model download.
+    The dense embedder is a stateless OpenRouter API client (no model
+    weights, no warm-up), so building the pipeline is cheap and offline;
+    the key is only checked when the pipeline actually runs. The BM25
+    sparse embedder is pure Python and stays fully local.
     """
     settings = settings or get_settings()
     document_store = get_document_store(recreate_index=recreate_index)
@@ -31,9 +29,9 @@ def build_indexing_pipeline(settings: Settings | None = None, *, recreate_index:
         split_length=settings.chunk_size,
         split_overlap=settings.chunk_overlap,
     )
-    dense_embedder = SentenceTransformersDocumentEmbedder(
+    dense_embedder = OpenRouterDocumentEmbedder(
         model=settings.embed_model,
-        device=ComponentDevice.from_str(settings.device),
+        batch_size=settings.embed_batch_size,
     )
     sparse_embedder = BM25SparseDocumentEmbedder()
     writer = DocumentWriter(document_store, policy=DuplicatePolicy.SKIP)

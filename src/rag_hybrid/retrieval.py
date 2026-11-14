@@ -17,16 +17,11 @@ from haystack import Pipeline
 from haystack.components.builders import AnswerBuilder, PromptBuilder
 from haystack.components.generators import OpenAIGenerator
 from haystack.dataclasses import Answer, Document
-from haystack.utils import ComponentDevice, Secret
-from haystack_integrations.components.embedders.sentence_transformers import (
-    SentenceTransformersTextEmbedder,
-)
-from haystack_integrations.components.rankers.sentence_transformers import (
-    SentenceTransformersSimilarityRanker,
-)
+from haystack.utils import Secret
 from haystack_integrations.components.retrievers.qdrant import QdrantHybridRetriever
 
 from .config import Settings, get_settings
+from .openrouter import OpenRouterReranker, OpenRouterTextEmbedder
 from .sparse import BM25SparseTextEmbedder
 from .store import get_document_store
 
@@ -43,11 +38,15 @@ PROMPT_TEMPLATE = (
 
 
 def _add_retrieval_components(pipeline: Pipeline, settings: Settings) -> None:
-    """Shared head: query embedders -> hybrid retriever (RRF) -> reranker."""
-    device = ComponentDevice.from_str(settings.device)
+    """Shared head: query embedders -> hybrid retriever (RRF) -> reranker.
+
+    The dense embedder and reranker are stateless OpenRouter API clients,
+    so every pipeline can cheaply own its own instances (no shared weights
+    to inject, no warm-up, no device).
+    """
     pipeline.add_component(
         "dense_text_embedder",
-        SentenceTransformersTextEmbedder(model=settings.embed_model, device=device),
+        OpenRouterTextEmbedder(model=settings.embed_model),
     )
     pipeline.add_component("bm25_query_embedder", BM25SparseTextEmbedder())
     pipeline.add_component(
@@ -59,9 +58,8 @@ def _add_retrieval_components(pipeline: Pipeline, settings: Settings) -> None:
     )
     pipeline.add_component(
         "ranker",
-        SentenceTransformersSimilarityRanker(
+        OpenRouterReranker(
             model=settings.reranker_model,
-            device=device,
             top_k=settings.rerank_top_k,
         ),
     )
@@ -100,6 +98,7 @@ def build_query_pipeline(settings: Settings | None = None) -> Pipeline:
     pipeline.add_component("answer_builder", AnswerBuilder())
 
     pipeline.connect("ranker.documents", "prompt_builder.documents")
+    pipeline.connect("ranker.documents", "answer_builder.documents")
     pipeline.connect("prompt_builder.prompt", "llm.prompt")
     pipeline.connect("llm.replies", "answer_builder.replies")
     return pipeline
@@ -131,6 +130,9 @@ def ask(pipeline: Pipeline, question: str) -> tuple[Answer, list[Document]]:
             "answer_builder": {"query": question},
         }
     )
+    # NOTE: Pipeline.run() returns only leaf-component outputs, and the
+    # ranker's documents are consumed downstream. The source documents are
+    # therefore read from the Answer itself (answer_builder.documents input).
     answer = result["answer_builder"]["answers"][0]
-    documents = result["ranker"]["documents"]
+    documents = list(answer.documents or [])
     return answer, documents

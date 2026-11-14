@@ -21,3 +21,6 @@ build/
 # Secrets / local config
 .env
 /rag-hybrid
+
+# deepeval local results
+.deepeval/

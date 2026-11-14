@@ -1,73 +1,121 @@
 # rag-hybrid
 
-Semi-local hybrid RAG in **Go** (stdlib-only): **Qdrant** with dense
-**Qwen3-Embedding-8B** (OpenRouter) + sparse **BM25** (local) fused with
-server-side **RRF**, reranked by **Voyage rerank-3-lite** (OpenRouter),
-answers by the **DeepSeek API**. Single 11 MB static binary; scratch Docker
-image; no ML models on the machine.
+**Hybrid RAG you can hold in one hand**: a single 11 MB Go binary that chats
+with your documents using dense **Qwen3-Embedding-8B** + local **BM25**,
+server-side **RRF** fusion, **rerank-3-lite** and grounded answers from
+**DeepSeek** — with an LLM-judged evaluation suite proving the quality.
 
-```
-query → Qwen3 embed (API) ┐
-       → BM25 sparse ──────┴→ Qdrant hybrid + RRF → rerank-3-lite → DeepSeek → answer + sources
-```
+![Architecture](docs/architecture.png)
 
-## Layout
+![Web UI](docs/ui.png)
 
-```
-cmd/rag-hybrid/       CLI entrypoint (serve / index / retrieve / ask)
-internal/bm25/        unicode tokenizer + hashed sparse encoder
-internal/openrouter/  embeddings + rerank HTTP clients
-internal/qdrant/      REST client: ensure/upsert/hybrid-query/drop
-internal/engine/      document loading, chunking, index & query flows
-internal/server/      net/http API + embedded web UI
-evals/                DeepEval harness + golden set (Python, optional)
-sample/               demo documents
-```
+> Upload `.md` / `.txt` / `.rst`, ask in natural language, get answers that
+> cite their sources. Every retrieval stage is measurable.
 
-## Quickstart (Docker)
+## Why this is not "just another RAG demo"
+
+| | Typical portfolio RAG | rag-hybrid |
+|---|---|---|
+| Retrieval | one embedding API | **hybrid**: dense + hand-written BM25 (Go), fused by RRF **inside Qdrant** |
+| Quality | "looks right" | **DeepEval suite, LLM-judge, 4 metrics with thresholds** (below) |
+| Deployment | container with Python runtime | **one static Go binary, 11 MB scratch image** |
+| Spanish | breaks on accents | unicode tokenizer keeps `búsqueda` whole |
+
+## Measured quality (LLM-judged golden set)
+
+Scores from `pytest -m eval evals/` against the live API (judge: DeepSeek):
+
+| Metric | Threshold | Score (avg of 6 questions) |
+|---|---|---|
+| Faithfulness — answer grounded in retrieved docs | ≥ 0.85 | **1.00** |
+| Contextual Precision — relevant chunks ranked first | ≥ 0.75 | **1.00** |
+| Contextual Recall — all needed chunks retrieved | ≥ 0.70 | **1.00** |
+| Answer Relevancy — answers the actual question | ≥ 0.70 | **0.92** |
+
+*LLM-as-judge has run-to-run variance: Answer Relevancy scored 6/6 in one
+run and 5/6 in another (one question 0.50). The eval harness ships in the
+repo — run it yourself.*
+
+## The rewrite story (why Go)
+
+The first engine was Python + Haystack + FastAPI (branch `feat/v1-scaffold`,
+kept for history). After moving the models to APIs, the framework was dead
+weight, so the engine was **rewritten in Go and verified to not regress** —
+same golden set, same thresholds:
+
+| | Python (Haystack) | Go (stdlib only) |
+|---|---|---|
+| Docker image | 360 MB | **11.2 MB** (scratch) |
+| Web app RAM | ~200 MB | **~40 MB** |
+| Eval baseline | 6/6 | **6/6** |
+
+## Cost profile
+
+| Stage | Price |
+|---|---|
+| Qwen3-Embedding-8B (OpenRouter) | ~$0.06 / M tokens |
+| rerank-3-lite (OpenRouter) | $0.02 / M tokens — **first 200M free** |
+| deepseek-chat (official API) | DeepSeek pricing |
+| BM25 + RRF + hosting | free (local code / your Qdrant) |
+
+Indexing a 30k-word document costs ≈ **$0.003**; a question ≈ **$0.0001**.
+
+## Quickstart
 
 ```bash
-cp env.example .env   # set OPENROUTER_API_KEY and DEEPSEEK_API_KEY
-docker compose up -d --build
+cp env.example .env          # add OPENROUTER_API_KEY and DEEPSEEK_API_KEY
+docker compose up -d --build # webapp (scratch) + Qdrant v1.14
 open http://127.0.0.1:8000
 ```
 
-Two containers: `webapp` (11 MB scratch image) + `qdrant` (v1.14.1, data in
-`./.qdrant_storage`, owned by your user). `docker compose down -v` plus
-deleting the repo leaves the machine exactly as it was.
-
-## Quickstart (binary)
+Or build the binary (Go 1.27, zero dependencies):
 
 ```bash
-go build -o rag-hybrid ./cmd/rag-hybrid   # or: go run ./cmd/rag-hybrid …
+go build -o rag-hybrid ./cmd/rag-hybrid
 docker compose up -d qdrant
 ./rag-hybrid index sample/ --recreate
-./rag-hybrid retrieve "damping constant RRF"
 ./rag-hybrid ask "How does RRF fuse the two ranked lists?"
-./rag-hybrid serve                       # web UI on WEB_HOST:WEB_PORT
+./rag-hybrid serve
 ```
 
-## Configuration
+## Code map
 
-Same variables as `env.example` (loaded from the environment or `.env`):
-OpenRouter (embed + rerank), DeepSeek, Qdrant URL/collection, chunking
-(400 words / 50 overlap), retrieval top-k (20 → rerank → 5), web host/port.
+```
+cmd/rag-hybrid/       CLI: serve / index / retrieve / ask
+internal/bm25/        unicode tokenizer + hashed sparse encoder (~110 lines)
+internal/openrouter/  embeddings + rerank HTTP clients
+internal/qdrant/      REST client: ensure / upsert / hybrid query (RRF) / drop
+internal/engine/      loading, chunking (400/50), index & query flows
+internal/server/      net/http API + web UI embedded via go:embed
+evals/                DeepEval harness + golden set (implementation-agnostic HTTP)
+```
 
-## Evaluation
+## Evaluating it yourself
 
 ```bash
-uv sync                    # only pytest/deepeval/openai (Python used for evals only)
-pytest -m eval evals/      # needs the API running + DEEPSEEK_API_KEY for the judge
+uv sync                    # pytest + deepeval only (evals are the sole Python left)
+pytest -m eval evals/      # needs the API running + DEEPSEEK_API_KEY
 ```
 
-Thresholds (research baseline): faithfulness ≥ 0.85, contextual precision
-≥ 0.75; recall and relevancy at 0.70.
+## Deploying
+
+The scratch image deploys anywhere containers run; the binary also runs
+bare (it only needs outbound HTTPS):
+
+```bash
+# Fly.io example (fits free tiers easily: 11 MB image, ~40 MB RAM)
+fly launch --dockerfile Dockerfile --name rag-hybrid
+fly secrets set OPENROUTER_API_KEY=... DEEPSEEK_API_KEY=... QDRANT_URL=https://<your-qdrant-cloud>
+fly deploy
+```
+
+Qdrant Cloud has a free 1 GB tier — or keep Qdrant local and deploy only
+the binary with a public tunnel.
 
 ## Notes
 
-- Qdrant server is pinned to `v1.14.1` in compose; the hybrid query uses
-  the REST API with two prefetch legs and `{"fusion":"rrf"}`.
-- The Go BM25 needs no Python-parity: the collection was recreated from
-  scratch after the rewrite (old data was disposable).
-- Python (Haystack) implementation lives in git history on branch
-  `feat/v1-scaffold`; `evals/` is the only Python that remains.
+- Qdrant pinned to `v1.14.1` (compose); the hybrid query uses REST prefetch
+  legs + `{"fusion":"rrf"}`.
+- The BM25 sparse encoder was rewritten for Go (unicode tokenizer for
+  Spanish); the collection was rebuilt from scratch — no legacy vectors.
+- Python implementation preserved in git history on `feat/v1-scaffold`.

@@ -1,5 +1,6 @@
 # Minimal build context: the Go module only.
 *
 !go.mod
+!go.sum
 !cmd
 !internal

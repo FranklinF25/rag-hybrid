@@ -81,11 +81,7 @@ func (ix *Indexer) IndexUploads(ctx context.Context, files []UploadFile) (IndexR
 			skipped = append(skipped, fmt.Sprintf("%s: larger than %d MB", file.Name, MaxUploadBytes/(1024*1024)))
 			continue
 		}
-		if !utf8.Valid(file.Data) {
-			skipped = append(skipped, fmt.Sprintf("%s: not valid UTF-8", file.Name))
-			continue
-		}
-		content := string(file.Data)
+		// PDFs are binary: extract text BEFORE the UTF-8 validation.
 		if strings.ToLower(filepath.Ext(file.Name)) == ".pdf" {
 			document, err := pdfToDocument(file.Name, file.Data)
 			if err != nil {
@@ -95,6 +91,11 @@ func (ix *Indexer) IndexUploads(ctx context.Context, files []UploadFile) (IndexR
 			documents = append(documents, document)
 			continue
 		}
+		if !utf8.Valid(file.Data) {
+			skipped = append(skipped, fmt.Sprintf("%s: not valid UTF-8", file.Name))
+			continue
+		}
+		content := string(file.Data)
 		if strings.TrimSpace(content) == "" {
 			skipped = append(skipped, fmt.Sprintf("%s: empty", file.Name))
 			continue

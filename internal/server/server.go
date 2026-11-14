@@ -184,8 +184,11 @@ func (s *Server) handleDocuments(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	result, err := s.indexer.IndexUploads(ctx, files)
 	if err != nil && result.Files == 0 {
-		code := http.StatusBadRequest
-		writeErr(w, code, err.Error())
+		detail := err.Error()
+		if len(result.Skipped) > 0 {
+			detail = fmt.Sprintf("%s — %s", strings.Join(result.Skipped, "; "), detail)
+		}
+		writeErr(w, http.StatusBadRequest, detail)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

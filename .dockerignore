@@ -1,0 +1,6 @@
+# Minimal build context: only what the image build needs.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src

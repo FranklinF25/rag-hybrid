@@ -17,3 +17,20 @@ services:
       # keep snapshots inside the bind-mounted storage dir.
       QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/storage/snapshots
     restart: unless-stopped
+
+  webapp:
+    build: .
+    container_name: rag-hybrid-webapp
+    depends_on:
+      - qdrant
+    ports:
+      # Host-side loopback only: the UI stays off the LAN.
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Service DNS inside the compose network (overrides the .env default).
+      QDRANT_URL: http://qdrant:6333
+    env_file:
+      # OPENROUTER_API_KEY / DEEPSEEK_API_KEY / model knobs. Passed as real
+      # env vars; never baked into the image (.dockerignore excludes .env).
+      - .env
+    restart: unless-stopped

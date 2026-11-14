@@ -22,29 +22,31 @@ evals/              # DeepEval harness + golden set
 
 ## Quickstart
 
+Everything runs in Docker — no Python, venv or models on your machine:
+
 ```bash
-# 1. Install (venv lives in ./.venv, nothing touches system Python)
+# 1. Keys
+cp env.example .env   # edit .env: OPENROUTER_API_KEY=... DEEPSEEK_API_KEY=...
+
+# 2. Build and run (Qdrant + webapp)
+docker compose up -d --build
+
+# 3. Chat UI + document upload
+open http://127.0.0.1:8000
+```
+
+The old host flow still works for development (CLI, tests):
+
+```bash
 uv sync
-
-# 2. Qdrant in Docker (data bind-mounted into ./.qdrant_storage)
-docker compose up -d
-
-# 3. Configure keys: OpenRouter (embed + rerank) and DeepSeek (generation)
-cp env.example .env   # then edit .env: OPENROUTER_API_KEY=... DEEPSEEK_API_KEY=...
-
-# 4. Web UI: chat + document upload (http://127.0.0.1:8000)
-rag-hybrid serve
-
-#    or from the CLI:
-rag-hybrid index sample/ --recreate   # --recreate: collection is dim-4096 now
+rag-hybrid index sample/ --recreate   # collection is dim-4096 (Qwen3)
 rag-hybrid retrieve "What is the damping constant in RRF?"
 rag-hybrid ask "How does RRF fuse the two result lists?"
 ```
 
-Isolation contract: everything stays inside the project folder — venv,
-Qdrant data (bind mount, owned by your user), no HF model cache anymore.
-`docker compose down -v` plus deleting the repo leaves the machine exactly
-as it was.
+Isolation contract: everything stays inside the project folder — the Docker
+bind mount (owned by your user) and nothing else. `docker compose down -v`
+plus deleting the repo leaves the machine exactly as it was.
 
 ## Version pins (important)
 

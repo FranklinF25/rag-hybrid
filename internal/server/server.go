@@ -14,6 +14,7 @@ import (
 
 	"rag-hybrid/internal/config"
 	"rag-hybrid/internal/engine"
+	"rag-hybrid/internal/qdrant"
 )
 
 //go:embed static/index.html
@@ -47,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("POST /api/chat", s.handleChat)
 	mux.HandleFunc("POST /api/documents", s.handleDocuments)
+	mux.HandleFunc("DELETE /api/documents", s.handleForget)
 	return logRequests(mux)
 }
 
@@ -217,6 +219,23 @@ func (s *Server) handleDocuments(w http.ResponseWriter, r *http.Request) {
 		"chunks":  result.Chunks,
 		"skipped": result.Skipped,
 	})
+}
+
+// handleForget removes every chunk of one source file: DELETE /api/documents?source=name
+func (s *Server) handleForget(w http.ResponseWriter, r *http.Request) {
+	source := strings.TrimSpace(r.URL.Query().Get("source"))
+	if source == "" {
+		writeErr(w, http.StatusBadRequest, "missing query parameter: source")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	client := qdrant.NewClient(s.cfg.QdrantURL, s.cfg.QdrantAPIKey, s.cfg.QdrantCollection)
+	if err := client.DeleteBySource(ctx, source); err != nil {
+		writeErr(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"forgotten": source})
 }
 
 func writeJSON(w http.ResponseWriter, code int, payload any) {

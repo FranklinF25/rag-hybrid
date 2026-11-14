@@ -333,3 +333,25 @@ func parsePointID(raw json.RawMessage) string {
 	}
 	return string(raw)
 }
+
+// DeleteBySource removes every point whose payload "source" matches the
+// given value (used for document sync: delete-then-insert keeps uploads
+// idempotent). A no-op when nothing matches.
+func (c *Client) DeleteBySource(ctx context.Context, source string) error {
+	path := "/collections/" + c.collection + "/points/delete?wait=true"
+	payload := map[string]any{
+		"filter": map[string]any{
+			"must": []map[string]any{
+				{"key": "source", "match": map[string]any{"value": source}},
+			},
+		},
+	}
+	status, body, err := c.do(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound {
+		return nil // collection gone: nothing to delete
+	}
+	return c.statusError(http.MethodPost, path, status, body)
+}

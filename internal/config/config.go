@@ -34,10 +34,11 @@ type Config struct {
 	QdrantCollection string
 
 	// Chunking / retrieval
-	ChunkSize     int
-	ChunkOverlap  int
-	RetrievalTopK int
-	RerankTopK    int
+	ChunkSize            int
+	ChunkOverlap         int
+	RetrievalTopK        int
+	RerankTopK           int
+	RerankScoreThreshold float64 // best rerank score below this -> deterministic "not in corpus" (0 disables)
 
 	// Web UI
 	WebHost string
@@ -51,25 +52,26 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("loading .env: %w", err)
 	}
 	c := &Config{
-		OpenRouterAPIKey:    env("OPENROUTER_API_KEY", ""),
-		OpenRouterBaseURL:   env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-		EmbedModel:          env("EMBED_MODEL", "qwen/qwen3-embedding-8b"),
-		EmbedDim:            envInt("EMBED_DIM", 4096),
-		EmbedBatchSize:      envInt("EMBED_BATCH_SIZE", 32),
-		RerankerModel:       env("RERANKER_MODEL", "mongodb/rerank-3-lite"),
-		DeepSeekAPIKey:      env("DEEPSEEK_API_KEY", ""),
-		LLMBaseURL:          env("LLM_BASE_URL", "https://api.deepseek.com/v1"),
-		LLMModel:            env("LLM_MODEL", "deepseek-chat"),
-		GenerationMaxTokens: envInt("GENERATION_MAX_TOKENS", 700),
-		QdrantURL:           env("QDRANT_URL", "http://localhost:6333"),
-		QdrantAPIKey:        env("QDRANT_API_KEY", ""),
-		QdrantCollection:    env("QDRANT_COLLECTION", "rag_hybrid"),
-		ChunkSize:           envInt("CHUNK_SIZE", 400),
-		ChunkOverlap:        envInt("CHUNK_OVERLAP", 50),
-		RetrievalTopK:       envInt("RETRIEVAL_TOP_K", 20),
-		RerankTopK:          envInt("RERANK_TOP_K", 5),
-		WebHost:             env("WEB_HOST", "127.0.0.1"),
-		WebPort:             envInt("WEB_PORT", 8000),
+		OpenRouterAPIKey:     env("OPENROUTER_API_KEY", ""),
+		OpenRouterBaseURL:    env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+		EmbedModel:           env("EMBED_MODEL", "qwen/qwen3-embedding-8b"),
+		EmbedDim:             envInt("EMBED_DIM", 4096),
+		EmbedBatchSize:       envInt("EMBED_BATCH_SIZE", 32),
+		RerankerModel:        env("RERANKER_MODEL", "mongodb/rerank-3-lite"),
+		DeepSeekAPIKey:       env("DEEPSEEK_API_KEY", ""),
+		LLMBaseURL:           env("LLM_BASE_URL", "https://api.deepseek.com/v1"),
+		LLMModel:             env("LLM_MODEL", "deepseek-chat"),
+		GenerationMaxTokens:  envInt("GENERATION_MAX_TOKENS", 700),
+		QdrantURL:            env("QDRANT_URL", "http://localhost:6333"),
+		QdrantAPIKey:         env("QDRANT_API_KEY", ""),
+		QdrantCollection:     env("QDRANT_COLLECTION", "rag_hybrid"),
+		ChunkSize:            envInt("CHUNK_SIZE", 400),
+		ChunkOverlap:         envInt("CHUNK_OVERLAP", 50),
+		RetrievalTopK:        envInt("RETRIEVAL_TOP_K", 20),
+		RerankTopK:           envInt("RERANK_TOP_K", 5),
+		RerankScoreThreshold: envFloat("RERANK_SCORE_THRESHOLD", 0.4),
+		WebHost:              env("WEB_HOST", "127.0.0.1"),
+		WebPort:              envInt("WEB_PORT", 8000),
 	}
 	if c.ChunkOverlap >= c.ChunkSize {
 		return nil, fmt.Errorf("CHUNK_OVERLAP (%d) must be smaller than CHUNK_SIZE (%d)", c.ChunkOverlap, c.ChunkSize)
@@ -120,6 +122,15 @@ func env(key, fallback string) string {
 func envInt(key string, fallback int) int {
 	if value := os.Getenv(key); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
+			return parsed
+		}
+	}
+	return fallback
+}
+
+func envFloat(key string, fallback float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.ParseFloat(value, 64); err == nil {
 			return parsed
 		}
 	}

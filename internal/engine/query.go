@@ -76,6 +76,9 @@ type Answer struct {
 }
 
 // Ask runs Retrieve and then generates a grounded answer with DeepSeek.
+// When the best rerank score stays below cfg.RerankScoreThreshold (and the
+// threshold is enabled), it returns a deterministic "not in corpus"
+// answer WITHOUT calling the LLM — cheaper, faster, no hallucination path.
 func (s *Searcher) Ask(ctx context.Context, question string) (Answer, error) {
 	hits, err := s.Retrieve(ctx, question)
 	if err != nil {
@@ -83,6 +86,9 @@ func (s *Searcher) Ask(ctx context.Context, question string) (Answer, error) {
 	}
 	if len(hits) == 0 {
 		return Answer{Text: "No indexed documents matched the question.", Sources: nil}, nil
+	}
+	if s.cfg.RerankScoreThreshold > 0 && hits[0].Score < s.cfg.RerankScoreThreshold {
+		return Answer{Text: fmt.Sprintf("I don't have relevant indexed documents for that question (best relevance %.2f).", hits[0].Score), Sources: nil}, nil
 	}
 	prompt := buildPrompt(question, hits)
 	text, err := s.llm.Complete(ctx, s.cfg.LLMModel, prompt, s.cfg.GenerationMaxTokens)

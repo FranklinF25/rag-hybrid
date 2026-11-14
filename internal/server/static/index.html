@@ -142,6 +142,7 @@
   <div id="uploadrow">
     <input id="fileinput" type="file" multiple accept=".md,.txt,.rst,.pdf" hidden>
     <button id="upload">Upload documents (.md, .txt, .rst, .pdf)</button>
+    <input id="forgetName" placeholder="forget a file…" size="14"><button id="forgetBtn">Forget</button>
     <span id="uploadresult"></span>
   </div>
 </div>
@@ -298,6 +299,19 @@ $fileInput.addEventListener("change", async () => {
 
 refreshHealth();
 enableInput();
+  const forgetBtn = document.getElementById("forgetBtn");
+  forgetBtn.addEventListener("click", async () => {
+    const name = document.getElementById("forgetName").value.trim();
+    if (!name) { status("Type a file name to forget."); return; }
+    forgetBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/documents?source=${encodeURIComponent(name)}`, {method: "DELETE"});
+      const data = await res.json();
+      status(res.ok ? `Forgot: ${data.forgotten}` : `Error: ${data.detail}`);
+      refreshHealth();
+    } catch (e) { status(`Error: ${e.message}`); }
+    forgetBtn.disabled = false;
+  });
 </script>
 </body>
 </html>

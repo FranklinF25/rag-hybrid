@@ -55,9 +55,10 @@ func usage() {
 
 commands:
   serve [--host H] [--port P]   run the web UI (defaults from WEB_HOST/WEB_PORT)
-  index <path> [--recreate]     index .md/.txt/.rst files (recursive)
+  index <path> [--recreate]     index .md/.txt/.rst/.pdf files (recursive)
   retrieve <query>              hybrid retrieval + rerank (no LLM)
-  ask <query>                   full RAG answer via DeepSeek`)
+  ask <query>                   full RAG answer via DeepSeek
+  forget <source>               remove every chunk indexed from a file`)
 }
 
 func fatalf(format string, args ...any) {

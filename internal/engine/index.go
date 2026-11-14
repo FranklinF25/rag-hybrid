@@ -134,7 +134,15 @@ func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate 
 	if err := ix.qd.EnsureCollection(ctx, ix.cfg.EmbedDim); err != nil {
 		return IndexResult{}, fmt.Errorf("ensuring collection: %w", err)
 	}
-
+	if !recreate {
+		// Sync per source (delete-then-insert): re-uploading a document
+		// replaces its chunks instead of duplicating them.
+		for _, source := range distinctSources(chunks) {
+			if err := ix.qd.DeleteBySource(ctx, source); err != nil {
+				return IndexResult{}, fmt.Errorf("syncing %s: %w", source, err)
+			}
+		}
+	}
 	batch := max(ix.cfg.EmbedBatchSize, 1)
 	written := 0
 	for start := 0; start < len(chunks); start += batch {
@@ -178,6 +186,19 @@ func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate 
 		written += len(points)
 	}
 	return IndexResult{Chunks: written}, nil
+}
+
+// distinctSources lists each source exactly once, in first-seen order.
+func distinctSources(chunks []chunkRef) []string {
+	seen := make(map[string]bool)
+	var sources []string
+	for _, c := range chunks {
+		if !seen[c.source] {
+			seen[c.source] = true
+			sources = append(sources, c.source)
+		}
+	}
+	return sources
 }
 
 // newID returns a random 32-char hex id for a Qdrant point.

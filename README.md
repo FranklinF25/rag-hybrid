@@ -112,6 +112,17 @@ fly deploy
 Qdrant Cloud has a free 1 GB tier — or keep Qdrant local and deploy only
 the binary with a public tunnel.
 
+## Document lifecycle
+
+- **Idempotent uploads**: indexing a file first removes its previous chunks
+  (delete-then-insert per source), so re-uploading never duplicates.
+
+- **Forget**: `rag-hybrid forget <file>` or `DELETE /api/documents?source=`
+  removes every chunk of one document; the UI has a Forget box.
+
+- **Deterministic "not in corpus"**: when the best rerank score stays below
+  `RERANK_SCORE_THRESHOLD` (default 0.4) the system answers without calling
+  the LLM — cheaper, faster, no hallucination path.
 ## Notes
 
 - PDFs are supported via a text-layer extractor (pure Go, no cgo): text

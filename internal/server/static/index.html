@@ -140,14 +140,14 @@
     <button id="send" disabled>Send</button>
   </div>
   <div id="uploadrow">
-    <input id="fileinput" type="file" multiple accept=".md,.txt,.rst" hidden>
-    <button id="upload">Upload documents (.md / .txt / .rst)</button>
+    <input id="fileinput" type="file" multiple accept=".md,.txt,.rst,.pdf" hidden>
+    <button id="upload">Upload documents (.md, .txt, .rst, .pdf)</button>
     <span id="uploadresult"></span>
   </div>
 </div>
 
 <footer>
-  Upload .md / .txt / .rst files to index them, then ask questions.
+  Upload .md, .txt, .rst, .pdf files to index them, then ask questions.
   Chat answers need DEEPSEEK_API_KEY in your .env; Qdrant must be running.
 </footer>
 

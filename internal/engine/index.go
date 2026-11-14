@@ -86,6 +86,15 @@ func (ix *Indexer) IndexUploads(ctx context.Context, files []UploadFile) (IndexR
 			continue
 		}
 		content := string(file.Data)
+		if strings.ToLower(filepath.Ext(file.Name)) == ".pdf" {
+			document, err := pdfToDocument(file.Name, file.Data)
+			if err != nil {
+				skipped = append(skipped, err.Error())
+				continue
+			}
+			documents = append(documents, document)
+			continue
+		}
 		if strings.TrimSpace(content) == "" {
 			skipped = append(skipped, fmt.Sprintf("%s: empty", file.Name))
 			continue

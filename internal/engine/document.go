@@ -18,8 +18,9 @@ type Document struct {
 	Source  string // relative or absolute path, kept as payload for citations
 }
 
-// SupportedSuffixes lists the file types accepted for indexing.
-var SupportedSuffixes = map[string]bool{".md": true, ".txt": true, ".rst": true}
+// SupportedSuffixes lists the file types accepted for indexing. PDFs go
+// through a text-layer extractor (scanned PDFs are rejected with a reason).
+var SupportedSuffixes = map[string]bool{".md": true, ".txt": true, ".rst": true, ".pdf": true}
 
 // LoadDocuments reads every supported file under path (a file or a
 // directory, recursive). It errors when nothing indexable is found.
@@ -55,6 +56,14 @@ func LoadDocuments(path string) ([]Document, error) {
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", file, err)
+		}
+		if strings.ToLower(filepath.Ext(file)) == ".pdf" {
+			document, err := pdfToDocument(file, content)
+			if err != nil {
+				return nil, err
+			}
+			documents = append(documents, document)
+			continue
 		}
 		if strings.TrimSpace(string(content)) == "" {
 			continue

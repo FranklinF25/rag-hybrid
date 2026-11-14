@@ -9,7 +9,7 @@ server-side **RRF** fusion, **rerank-3-lite** and grounded answers from
 
 ![Web UI](docs/ui.png)
 
-> Upload `.md` / `.txt` / `.rst`, ask in natural language, get answers that
+> Upload `.md` / `.txt` / `.rst` / `.pdf`, ask in natural language, get answers that
 > cite their sources. Every retrieval stage is measurable.
 
 ## Why this is not "just another RAG demo"
@@ -73,7 +73,7 @@ Or build the binary (Go 1.27, zero dependencies):
 ```bash
 go build -o rag-hybrid ./cmd/rag-hybrid
 docker compose up -d qdrant
-./rag-hybrid index sample/ --recreate
+./rag-hybrid index sample/ --recreate   # any path: .md/.txt/.rst/.pdf
 ./rag-hybrid ask "How does RRF fuse the two ranked lists?"
 ./rag-hybrid serve
 ```
@@ -113,6 +113,11 @@ Qdrant Cloud has a free 1 GB tier — or keep Qdrant local and deploy only
 the binary with a public tunnel.
 
 ## Notes
+
+- PDFs are supported via a text-layer extractor (pure Go, no cgo): text
+  PDFs index normally; scanned/image-only PDFs are skipped with a clear
+  reason (OCR is not supported).
+- PDFs are supported via a text-layer extractor (pure Go, no cgo): text PDFs index normally; scanned/image-only PDFs are skipped with a clear reason (OCR is not supported).
 
 - Qdrant pinned to `v1.14.1` (compose); the hybrid query uses REST prefetch
   legs + `{"fusion":"rrf"}`.

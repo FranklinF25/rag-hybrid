@@ -1,20 +1,16 @@
-# ---- build stage: resolve and install deps with uv ----
-FROM python:3.12-slim AS builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-WORKDIR /app
-COPY pyproject.toml uv.lock README.md ./
-COPY src ./src
-# Main dependencies only: no dev (pytest) / eval (deepeval) groups in runtime.
-RUN uv sync --frozen --no-default-groups
+# ---- build stage: static Go binary ----
+FROM golang:1.27-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rag-hybrid ./cmd/rag-hybrid
 
-# ---- runtime stage ----
-FROM python:3.12-slim
-RUN useradd --create-home --uid 1000 app
-WORKDIR /app
-COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --chown=app:app src ./src
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1
-USER app
+# ---- runtime stage: scratch + CA certs (HTTPS to OpenRouter/DeepSeek) ----
+FROM scratch
+COPY --from=build /out/rag-hybrid /rag-hybrid
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+USER 1000:1000
 EXPOSE 8000
-CMD ["rag-hybrid", "serve", "--host", "0.0.0.0"]
+ENTRYPOINT ["/rag-hybrid"]
+CMD ["serve", "--host", "0.0.0.0"]

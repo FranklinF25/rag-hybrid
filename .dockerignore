@@ -1,6 +1,5 @@
-# Minimal build context: only what the image build needs.
+# Minimal build context: the Go module only.
 *
-!pyproject.toml
-!uv.lock
-!README.md
-!src
+!go.mod
+!cmd
+!internal

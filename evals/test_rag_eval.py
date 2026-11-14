@@ -1,66 +1,80 @@
-"""DeepEval harness: RAG metrics over the golden set.
+"""DeepEval harness: RAG metrics over the Go rag-hybrid HTTP API.
+
+Language-agnostic since the Go rewrite: this suite only talks to the
+running API, so it can evaluate any implementation of the contract.
 
 Run:
-    DEEPSEEK_API_KEY=sk-... pytest -m eval evals/
+    pytest -m eval evals/          (with the webapp serving on RAG_URL)
 
 Prerequisites (the suite skips with a reason otherwise):
-- local Qdrant up and the sample collection indexed
-  (``rag-hybrid index sample/ --recreate``)
-- ``DEEPSEEK_API_KEY`` in the environment (or ``.env``)
+- the rag-hybrid API reachable (RAG_URL, default http://127.0.0.1:8000)
+- ``DEEPSEEK_API_KEY`` for the judge (env or .env)
 
 Thresholds follow the research baseline: faithfulness >= 0.85 and
-contextual precision >= 0.75 are pinned; contextual recall and answer
-relevancy use 0.70 as v1 starting points.
-
-All models are stateless API clients (Qwen3 embeddings and rerank-3-lite
-via OpenRouter, DeepSeek for generation): the single module-scoped query
-pipeline holds no local weights; each golden question reuses it. The
-retrieval context is taken from the same run (the reranked documents), so
-no second pipeline is built.
+contextual precision >= 0.75 are pinned; recall and relevancy use 0.70.
 """
 
 from __future__ import annotations
 
 import csv
 import json
+import os
 import urllib.request
 from pathlib import Path
 from typing import Any
 
 import pytest
-from deepeval import assert_test
-from deepeval.metrics import (
-    AnswerRelevancyMetric,
-    ContextualPrecisionMetric,
-    ContextualRecallMetric,
-    FaithfulnessMetric,
-)
-from deepeval.models import DeepEvalBaseLLM
-from deepeval.test_case import LLMTestCase
-from openai import NOT_GIVEN, OpenAI
-
-from rag_hybrid.config import get_settings
-from rag_hybrid.retrieval import ask, build_query_pipeline
 
 GOLDEN_SET = Path(__file__).parent / "golden_set.csv"
+RAG_URL = os.environ.get("RAG_URL", "http://127.0.0.1:8000").rstrip("/")
+HEALTH_TIMEOUT = 3
+QUERY_TIMEOUT = 180
 
 pytestmark = pytest.mark.eval
 
 
+def _load_dotenv(path: str = ".env") -> None:
+    """Minimal .env loader (KEY=VALUE, never overrides real env vars)."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key, value = key.strip(), value.strip().strip("'\"")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+_load_dotenv()
+
+
+def api_get(path: str, timeout: float = QUERY_TIMEOUT) -> dict[str, Any]:
+    with urllib.request.urlopen(f"{RAG_URL}{path}", timeout=timeout) as response:
+        return json.load(response)
+
+
+def api_chat(message: str) -> dict[str, Any]:
+    payload = json.dumps({"message": message}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{RAG_URL}/api/chat",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=QUERY_TIMEOUT) as response:
+        return json.load(response)
+
+
 def _prerequisite_reason() -> str | None:
-    settings = get_settings()
-    if not settings.deepseek_api_key:
-        return "DEEPSEEK_API_KEY is not set"
     try:
-        url = f"{settings.qdrant_url.rstrip('/')}/collections/{settings.qdrant_collection}"
-        with urllib.request.urlopen(url, timeout=3) as response:
-            points = json.loads(response.read())["result"]["points_count"]
-        if points == 0:
-            return f"collection '{settings.qdrant_collection}' is empty: run `rag-hybrid index sample/ --recreate`"
+        api_get("/api/health", timeout=HEALTH_TIMEOUT)
     except OSError:
-        return f"Qdrant not reachable at {settings.qdrant_url} (docker compose up -d)"
-    except (KeyError, ValueError):
-        return f"unexpected response from Qdrant for collection '{settings.qdrant_collection}'"
+        return f"rag-hybrid API not reachable at {RAG_URL} (start it: rag-hybrid serve / docker compose up webapp)"
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        return "DEEPSEEK_API_KEY is not set (judge)"
     return None
 
 
@@ -69,41 +83,27 @@ if _PREREQUISITE_REASON:
     pytest.skip(_PREREQUISITE_REASON, allow_module_level=True)
 
 
-class DeepSeekJudge(DeepEvalBaseLLM):
-    """DeepSeek as the DeepEval judge (OpenAI-compatible endpoint)."""
-
+class DeepSeekJudge:  # DeepEvalBaseLLM, imported lazily after the skip gate
     def __init__(self, *, api_key: str, base_url: str, model: str) -> None:
+        from openai import OpenAI
+
         self._model = model
         self._client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def load_model(self) -> OpenAI:
+    def load_model(self):
         return self._client
 
     def generate(self, prompt: str, schema: Any = None, **kwargs: Any):
         response = self._client.chat.completions.create(
             model=self._model,
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"} if schema is not None else NOT_GIVEN,
+            max_tokens=4000,
         )
         content = response.choices[0].message.content or ""
         if schema is None:
             return content
-        # Strip accidental markdown fences before validating.
         cleaned = content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        try:
-            return schema.model_validate_json(cleaned)
-        except ValueError:
-            # One retry with an explicit instruction, then surface the error.
-            retry = self._client.chat.completions.create(
-                model=self._model,
-                messages=[
-                    {"role": "user", "content": prompt},
-                    {"role": "assistant", "content": content},
-                    {"role": "user", "content": "Return ONLY valid JSON matching the requested schema."},
-                ],
-                response_format={"type": "json_object"},
-            )
-            return schema.model_validate_json(retry.choices[0].message.content or "")
+        return schema.model_validate_json(cleaned)
 
     async def a_generate(self, prompt: str, schema: Any = None, **kwargs: Any):
         return self.generate(prompt, schema=schema, **kwargs)
@@ -113,17 +113,14 @@ class DeepSeekJudge(DeepEvalBaseLLM):
 
 
 @pytest.fixture(scope="module")
-def query_pipeline():
-    return build_query_pipeline()
-
-
-@pytest.fixture(scope="module")
 def judge():
-    settings = get_settings()
-    return DeepSeekJudge(
-        api_key=settings.deepseek_api_key,
-        base_url=settings.llm_base_url,
-        model=settings.llm_model,
+    from deepeval.models import DeepEvalBaseLLM
+
+    # Dynamically attach the base class so the import stays behind the gate.
+    return type("Judge", (DeepEvalJudge, DeepEvalBaseLLM), {})(
+        api_key=os.environ["DEEPSEEK_API_KEY"],
+        base_url=os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/v1"),
+        model=os.environ.get("LLM_MODEL", "deepseek-chat"),
     )
 
 
@@ -133,15 +130,25 @@ def _golden_rows() -> list[tuple[str, str]]:
 
 
 @pytest.mark.parametrize("question,expected", _golden_rows(), ids=lambda value: value[:48])
-def test_golden_set(question: str, expected: str, query_pipeline, judge: DeepSeekJudge):
-    answer, documents = ask(query_pipeline, question)
-    retrieval_context = [document.content or "" for document in documents]
+def test_golden_set(question: str, expected: str, judge):
+    from deepeval import assert_test
+    from deepeval.metrics import (
+        AnswerRelevancyMetric,
+        ContextualPrecisionMetric,
+        ContextualRecallMetric,
+        FaithfulnessMetric,
+    )
+    from deepeval.test_case import LLMTestCase
+
+    retrieval = api_get(f"/api/search?q={urllib.request.quote(question)}&full=1")
+    contexts = [result["content"] for result in retrieval["results"]]
+    chat = api_chat(question)
 
     test_case = LLMTestCase(
         input=question,
-        actual_output=answer.data or "",
+        actual_output=chat["answer"],
         expected_output=expected,
-        retrieval_context=retrieval_context,
+        retrieval_context=contexts,
     )
     metrics = [
         FaithfulnessMetric(threshold=0.85, model=judge, include_reason=True),

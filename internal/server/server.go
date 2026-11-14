@@ -87,10 +87,15 @@ type sourceView struct {
 	Source  string  `json:"source"`
 	Score   float64 `json:"score"`
 	Preview string  `json:"preview"`
+	Content string  `json:"content,omitempty"` // full text, only with ?full=1
 }
 
-func toSourceView(source string, score float64, content string) sourceView {
-	return sourceView{Source: source, Score: score, Preview: preview(content, 140)}
+func toSourceView(source string, score float64, content string, full bool) sourceView {
+	view := sourceView{Source: source, Score: score, Preview: preview(content, 140)}
+	if full {
+		view.Content = content
+	}
+	return view
 }
 
 func preview(content string, max int) string {
@@ -115,8 +120,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	results := make([]sourceView, 0, len(hits))
+	full := r.URL.Query().Get("full") == "1"
 	for _, hit := range hits {
-		results = append(results, toSourceView(hit.Source, hit.Score, hit.Content))
+		results = append(results, toSourceView(hit.Source, hit.Score, hit.Content, full))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
@@ -143,7 +149,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	sources := make([]sourceView, 0, len(answer.Sources))
 	for _, hit := range answer.Sources {
-		sources = append(sources, toSourceView(hit.Source, hit.Score, hit.Content))
+		sources = append(sources, toSourceView(hit.Source, hit.Score, hit.Content, false))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"answer": answer.Text, "sources": sources})
 }

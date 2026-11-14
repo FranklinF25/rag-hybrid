@@ -117,7 +117,7 @@ def judge():
     from deepeval.models import DeepEvalBaseLLM
 
     # Dynamically attach the base class so the import stays behind the gate.
-    return type("Judge", (DeepEvalJudge, DeepEvalBaseLLM), {})(
+    return type("Judge", (DeepSeekJudge, DeepEvalBaseLLM), {})(
         api_key=os.environ["DEEPSEEK_API_KEY"],
         base_url=os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/v1"),
         model=os.environ.get("LLM_MODEL", "deepseek-chat"),

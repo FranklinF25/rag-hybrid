@@ -39,7 +39,7 @@ func New(cfg *config.Config) *Server {
 	}
 }
 
-// Handler returns the routed http.Handler.
+// Handler returns the routed http.Handler with request logging.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", s.handleIndex)
@@ -47,7 +47,28 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("POST /api/chat", s.handleChat)
 	mux.HandleFunc("POST /api/documents", s.handleDocuments)
-	return mux
+	return logRequests(mux)
+}
+
+// statusRecorder captures the response code for logging.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+// logRequests prints one line per request: method, path, status, duration.
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(recorder, r)
+		fmt.Printf("%s %s -> %d (%s)\n", r.Method, r.URL.RequestURI(), recorder.status, time.Since(start).Round(time.Millisecond))
+	})
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, _ *http.Request) {

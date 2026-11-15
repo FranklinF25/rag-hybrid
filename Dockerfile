@@ -10,6 +10,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rag-hybrid ./cmd/r
 FROM scratch
 COPY --from=build /out/rag-hybrid /rag-hybrid
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+ENV DATA_DIR=/data
 USER 1000:1000
 EXPOSE 8000
 ENTRYPOINT ["/rag-hybrid"]

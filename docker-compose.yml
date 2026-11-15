@@ -33,4 +33,7 @@ services:
       # OPENROUTER_API_KEY / DEEPSEEK_API_KEY / model knobs. Passed as real
       # env vars; never baked into the image (.dockerignore excludes .env).
       - .env
+    volumes:
+      # Conversation store persists across container rebuilds.
+      - ./.data:/data
     restart: unless-stopped

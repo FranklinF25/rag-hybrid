@@ -33,14 +33,34 @@
   }
   button { font: inherit; cursor: pointer; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   aside {
     background: var(--pane); border-right: 1px solid var(--border);
     padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
   }
   aside h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
   aside h1 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up-dot); }
+
+  .newchat {
+    background: var(--accent); color: var(--on-accent); border: 0; border-radius: 8px;
+    padding: 10px 14px; font-weight: 600; min-height: 40px; width: 100%;
+  }
+  .chats h2, .docs h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  #chatlist, #doclist { list-style: none; display: flex; flex-direction: column; gap: 6px; padding: 0; }
+  #chatlist li {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 8px 8px 12px; display: flex; align-items: center; gap: 8px;
+  }
+  #chatlist li.active { border-color: var(--accent); }
+  #chatlist .meta { min-width: 0; flex: 1; cursor: pointer; }
+  #chatlist .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #chatlist .sub { font-size: 11.5px; color: var(--muted); }
+  #chatlist .del { border: 0; background: none; color: var(--danger); font-size: 11.5px; padding: 8px; min-width: 36px; min-height: 36px; border-radius: 6px; }
+  #chatlist .del:hover { text-decoration: underline; }
+  .emptychat { font-size: 12.5px; color: var(--muted); }
+
   .drop {
-    border: 1.5px dashed var(--drop-border); border-radius: 10px; padding: 18px 14px;
+    border: 1.5px dashed var(--drop-border); border-radius: 10px; padding: 16px 14px;
     text-align: center; color: var(--muted); font-size: 13px; background: var(--bg);
     transition: border-color 120ms ease, background-color 120ms ease;
   }
@@ -48,18 +68,17 @@
   .drop b { color: var(--accent); }
   .drop input { display: none; }
   .drop label { color: var(--accent); cursor: pointer; }
-  .docs h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
-  ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-  li { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
-  li .meta { min-width: 0; flex: 1; }
-  li .name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  li .sub { font-size: 12px; color: var(--muted); }
+  #doclist li { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+  #doclist li .meta { min-width: 0; flex: 1; }
+  #doclist .name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #doclist .sub { font-size: 12px; color: var(--muted); }
   .forget { border: 0; background: none; color: var(--danger); font-size: 12px; padding: 10px; min-width: 44px; min-height: 44px; }
   .forget:hover { text-decoration: underline; }
   .empty { font-size: 13px; color: var(--muted); background: var(--card); border: 1px dashed var(--drop-border); border-radius: 8px; padding: 14px; }
   aside footer { margin-top: auto; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 12px; }
   aside footer .ok { color: var(--ok); font-weight: 600; }
   aside footer .bad { color: var(--danger); font-weight: 600; }
+
   section { display: flex; flex-direction: column; min-width: 0; }
   .top { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid var(--border); background: var(--card); flex-wrap: wrap; }
   .top h2 { font-size: 15px; font-weight: 600; }
@@ -67,18 +86,23 @@
   .top .spacer { flex: 1; }
   #theme { border: 0; background: var(--pill-bg); color: var(--muted); border-radius: 999px; padding: 6px 14px; min-height: 32px; }
   #theme:hover { color: var(--text); }
+
   .log { flex: 1; overflow-y: auto; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 900px; width: 100%; margin: 0 auto; }
   .user { align-self: flex-end; max-width: 75%; background: var(--accent); color: var(--on-accent); border-radius: 14px 14px 4px 14px; padding: 12px 16px; white-space: pre-wrap; }
   .assistant { max-width: 85%; }
   .assistant .label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; }
   .assistant p { background: var(--card); border: 1px solid var(--border); border-radius: 4px 14px 14px 14px; padding: 14px 16px; white-space: pre-wrap; }
   .assistant.pending p { color: var(--muted); }
+  .assistant .searched { font-size: 12px; color: var(--muted); margin: 4px 0 6px 4px; font-style: italic; }
   .sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-left: 4px; }
   .sources .s { font-size: 12.5px; color: var(--text); background: var(--pill-bg); border-radius: 999px; padding: 5px 12px; }
   .sources .s b { color: var(--ok); font-weight: 600; }
   .nomatch { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); border-radius: 4px 14px 14px 14px; padding: 14px 16px; font-size: 14px; }
-  .nomatch .why { display: block; margin-top: 6px; font-size: 12.5px; color: var(--warn-text); }
   .error { background: var(--err-bg); border: 1px solid var(--err-border); color: var(--err-text); border-radius: 4px 14px 14px 14px; padding: 14px 16px; font-size: 14px; }
+  .cursor { display: inline-block; width: 8px; height: 15px; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 0% {opacity: 1} 50% {opacity: 0} 100% {opacity: 1} }
+  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+
   .composer { border-top: 1px solid var(--border); background: var(--card); padding: 16px 28px 20px; }
   .composer form { max-width: 900px; margin: 0 auto; display: flex; gap: 10px; }
   .composer input { flex: 1; border: 1px solid var(--input-border); border-radius: 10px; padding: 13px 16px; font: inherit; background: var(--card); color: var(--text); }
@@ -90,14 +114,21 @@
   @media (prefers-reduced-motion: no-preference) { .composer button:hover { filter: brightness(1.05); } }
   @media (max-width: 900px) {
     body { grid-template-columns: 1fr; }
-    aside { border-right: 0; border-bottom: 1px solid var(--border); padding: 16px 20px; }
+    aside { border-right: 0; border-bottom: 1px solid var(--border); padding: 16px 20px; max-height: 40vh; }
     aside footer { display: none; }
   }
 </style>
 </head>
 <body>
-<aside aria-label="indexed documents">
+<aside aria-label="conversations and documents">
   <h1><span class="dot" id="healthDot" aria-hidden="true"></span> rag-hybrid</h1>
+
+  <button class="newchat" id="newchat">+ New chat</button>
+  <nav class="chats" aria-label="conversations">
+    <h2>Conversations</h2>
+    <ul id="chatlist"></ul>
+  </nav>
+
   <div class="drop" id="drop" tabindex="0">
     <b>Drop files</b> or <label for="upload">choose files</label>
     <input id="upload" type="file" multiple accept=".md,.txt,.rst,.pdf">
@@ -120,7 +151,7 @@
     <h2>Chat</h2>
     <span class="pill">hybrid · RRF · rerank-3-lite</span>
     <span class="spacer"></span>
-    <span class="pill">threshold <span id="thr">0.40</span></span>
+    <span class="pill">threshold 0.40</span>
     <button id="theme" aria-label="Toggle dark mode">🌙 dark</button>
   </div>
 
@@ -132,7 +163,7 @@
       <input type="text" id="question" placeholder="Ask your documents…" aria-label="question" autocomplete="off">
       <button type="submit" id="send">Send</button>
     </form>
-    <p class="hint">Answers cite their sources. Uploading replaces a file's previous chunks; Forget removes them.</p>
+    <p class="hint">Answers cite their sources. Follow-up questions are answered in the context of the conversation.</p>
   </div>
 </section>
 
@@ -140,8 +171,25 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const log = $("log"), statusline = $("statusline"), send = $("send"), question = $("question");
+let currentConversation = null;
 
 function status(text) { statusline.textContent = text || ""; }
+
+/* ---------- theme ---------- */
+const themeBtn = $("theme");
+function applyTheme(mode) {
+  document.documentElement.dataset.theme = mode;
+  themeBtn.textContent = mode === "dark" ? "☀️ light" : "🌙 dark";
+  try { localStorage.setItem("rag-hybrid-theme", mode); } catch (e) {}
+}
+themeBtn.addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
+(function () {
+  let stored = null;
+  try { stored = localStorage.getItem("rag-hybrid-theme"); } catch (e) {}
+  applyTheme(stored || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+})();
 
 /* ---------- health + documents ---------- */
 function svc(id, ok, label) {
@@ -149,11 +197,9 @@ function svc(id, ok, label) {
   el.textContent = (ok ? "✓ " : "✗ ") + label;
   el.className = ok ? "ok" : "bad";
 }
-
 async function refreshHealth() {
   try {
-    const res = await fetch("/api/health");
-    const d = await res.json();
+    const d = await (await fetch("/api/health")).json();
     const up = d.qdrant === true;
     $("healthDot").className = "dot" + (up ? " up" : "");
     svc("svcQdrant", up, "qdrant " + (typeof d.points === "number" ? d.points : "–"));
@@ -161,12 +207,8 @@ async function refreshHealth() {
     svc("svcDeepseek", d.key === true, "deepseek");
   } catch (e) {
     $("healthDot").className = "dot";
-    ["svcQdrant", "svcOpenrouter", "svcDeepseek"].forEach((id) => svc(id, false, id.replace("svc", "").toLowerCase()));
   }
 }
-
-function extOf(name) { return name.slice(name.lastIndexOf(".") + 1).toUpperCase() || "?"; }
-
 function renderDocs(docs) {
   const list = $("doclist");
   list.textContent = "";
@@ -192,16 +234,14 @@ function renderDocs(docs) {
     list.appendChild(li);
   }
 }
-
 async function refreshDocs() {
   try {
-    const res = await fetch("/api/documents");
-    const d = await res.json();
+    const d = await (await fetch("/api/documents")).json();
     renderDocs(d.documents || []);
-  } catch (e) { /* health pill already shows qdrant state */ }
+  } catch (e) { /* health pill covers it */ }
 }
 
-/* ---------- upload ---------- */
+/* ---------- upload / forget ---------- */
 async function upload(files) {
   if (!files || !files.length) return;
   const form = new FormData();
@@ -217,19 +257,13 @@ async function upload(files) {
     refreshDocs(); refreshHealth();
   } catch (e) { status("Error: " + e.message); }
 }
-
 const drop = $("drop");
 drop.addEventListener("click", (e) => { if (e.target.tagName !== "LABEL") $("upload").click(); });
 $("upload").addEventListener("change", (e) => { upload(e.target.files); e.target.value = ""; });
-for (const ev of ["dragover", "dragenter"]) {
-  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); });
-}
-for (const ev of ["dragleave", "drop"]) {
-  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); });
-}
+for (const ev of ["dragover", "dragenter"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); });
+for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); });
 drop.addEventListener("drop", (e) => upload(e.dataTransfer.files));
 
-/* ---------- forget ---------- */
 async function forget(source) {
   status("Forgetting " + source + "…");
   try {
@@ -240,38 +274,89 @@ async function forget(source) {
   } catch (e) { status("Error: " + e.message); }
 }
 
-/* ---------- chat ---------- */
+/* ---------- conversations panel ---------- */
+function timeAgo(ts) {
+  const s = Math.max(1, Math.floor(Date.now() / 1000 - ts));
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+function renderChats(convs) {
+  const list = $("chatlist");
+  list.textContent = "";
+  if (!convs.length) {
+    const li = document.createElement("li");
+    li.className = "emptychat";
+    li.textContent = "No conversations yet.";
+    list.appendChild(li);
+    return;
+  }
+  for (const c of convs) {
+    const li = document.createElement("li");
+    if (c.id === currentConversation) li.className = "active";
+    const meta = document.createElement("div"); meta.className = "meta";
+    const name = document.createElement("div"); name.className = "name"; name.textContent = c.title || "(untitled)"; name.title = c.title;
+    const sub = document.createElement("div"); sub.className = "sub"; sub.textContent = c.turns + " turns · " + timeAgo(c.updated_at);
+    meta.append(name, sub);
+    meta.addEventListener("click", () => loadConversation(c.id));
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✕"; del.setAttribute("aria-label", "delete conversation " + (c.title || c.id));
+    del.addEventListener("click", async () => {
+      try {
+        await fetch("/api/conversations?id=" + encodeURIComponent(c.id), { method: "DELETE" });
+        if (currentConversation === c.id) newChat();
+        refreshChats();
+      } catch (e) { status("Error: " + e.message); }
+    });
+    li.append(meta, del);
+    list.appendChild(li);
+  }
+}
+async function refreshChats() {
+  try {
+    const d = await (await fetch("/api/conversations")).json();
+    renderChats(d.conversations || []);
+  } catch (e) { /* ignore */ }
+}
+function newChat() {
+  currentConversation = null;
+  log.textContent = "";
+  refreshChats();
+  question.focus();
+}
+$("newchat").addEventListener("click", newChat);
+
+async function loadConversation(id) {
+  currentConversation = id;
+  log.textContent = "";
+  try {
+    const d = await (await fetch("/api/conversations/" + encodeURIComponent(id) + "/turns")).json();
+    for (const t of d.turns || []) {
+      if (t.role === "user") addUser(t.content);
+      else addStoredAssistant(t.content, t.sources || []);
+    }
+  } catch (e) { status("Error loading conversation: " + e.message); }
+  refreshChats();
+  scrollBottom();
+}
+
+/* ---------- chat rendering ---------- */
 function addUser(text) {
   const div = document.createElement("div");
   div.className = "user"; div.textContent = text;
   log.appendChild(div); scrollBottom();
 }
-function addAssistantNode(labelText, pending) {
-  const wrap = document.createElement("div"); wrap.className = "assistant" + (pending ? " pending" : "");
+function assistantShell(labelText) {
+  const wrap = document.createElement("div"); wrap.className = "assistant";
   const label = document.createElement("div"); label.className = "label"; label.textContent = labelText;
+  const searched = document.createElement("div"); searched.className = "searched"; searched.hidden = true;
   const p = document.createElement("p");
-  p.textContent = pending ? "Retrieving and reranking…" : "";
-  wrap.append(label, p); log.appendChild(wrap); scrollBottom();
-  return { wrap, p };
+  wrap.append(label, searched, p);
+  log.appendChild(wrap); scrollBottom();
+  return { wrap, label, searched, p };
 }
-function scrollBottom() { log.scrollTop = log.scrollHeight; }
-
-function renderAnswer(node, d) {
-  const sources = d.sources || [];
-  const notInCorpus = sources.length === 0;
-  if (notInCorpus) {
-    node.wrap.innerHTML = "";
-    const label = document.createElement("div"); label.className = "label"; label.textContent = "answer · not in corpus";
-    const box = document.createElement("div"); box.className = "nomatch";
-    box.textContent = d.answer || "No indexed documents matched the question.";
-    const why = document.createElement("span"); why.className = "why";
-    why.textContent = "Below the relevance threshold — answered locally without a generation call.";
-    box.appendChild(why);
-    node.wrap.append(label, box);
-    return;
-  }
-  node.wrap.className = "assistant";
-  node.p.textContent = d.answer || "(empty answer)";
+function sourcesRow(sources) {
   const row = document.createElement("div"); row.className = "sources";
   for (const s of sources) {
     const chip = document.createElement("span"); chip.className = "s";
@@ -280,54 +365,124 @@ function renderAnswer(node, d) {
     chip.append(score, " " + s.source);
     row.appendChild(chip);
   }
-  node.wrap.appendChild(row);
+  return row;
 }
+function notInCorpusBox(text) {
+  const box = document.createElement("div"); box.className = "nomatch";
+  box.textContent = text;
+  const why = document.createElement("span"); why.className = "why";
+  why.textContent = "Below the relevance threshold — answered locally without a generation call.";
+  box.appendChild(why);
+  return box;
+}
+function scrollBottom() { log.scrollTop = log.scrollHeight; }
 
+/* ---------- streaming ask ---------- */
 $("askform").addEventListener("submit", async (e) => {
   e.preventDefault();
   const message = question.value.trim();
   if (!message || send.disabled) return;
   send.disabled = true;
-  addUser(message); question.value = "";
-  const node = addAssistantNode("answer", true);
+  addUser(message);
+  question.value = "";
+  const node = assistantShell("answer");
+  node.p.textContent = "";
+  const cursor = document.createElement("span"); cursor.className = "cursor";
+  node.p.appendChild(cursor);
+  let full = "";
+  let notInCorpus = false;
+
   try {
-    const res = await fetch("/api/chat", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+    const res = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, conversation_id: currentConversation }),
     });
-    const d = await res.json();
-    if (!res.ok) {
-      node.wrap.className = "assistant";
-      node.wrap.innerHTML = "";
-      const label = document.createElement("div"); label.className = "label"; label.textContent = "error";
-      const box = document.createElement("div"); box.className = "error"; box.textContent = d.detail || ("HTTP " + res.status);
-      node.wrap.append(label, box);
-    } else {
-      renderAnswer(node, d);
+    if (!res.ok || !res.body) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.detail || ("HTTP " + res.status));
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        let event = "message", data = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event: ")) event = line.slice(7).trim();
+          else if (line.startsWith("data: ")) data += line.slice(6);
+        }
+        handleEvent(event, data ? JSON.parse(data) : {});
+      }
     }
   } catch (err) {
-    node.p.textContent = "Error: " + err.message;
     node.wrap.className = "assistant";
+    node.wrap.innerHTML = "";
+    const label = document.createElement("div"); label.className = "label"; label.textContent = "error";
+    const box = document.createElement("div"); box.className = "error"; box.textContent = err.message;
+    node.wrap.append(label, box);
   }
-  send.disabled = false; question.focus(); scrollBottom();
+
+  function handleEvent(ev, d) {
+    if (ev === "conversation") { currentConversation = d.id; }
+    else if (ev === "rewritten") {
+      if (d.query && d.query !== message) {
+        node.searched.hidden = false;
+        node.searched.textContent = "searched as: " + d.query;
+      }
+    } else if (ev === "sources") {
+      if (d.sources && d.sources.length) {
+        node.wrap.appendChild(sourcesRow(d.sources));
+        scrollBottom();
+      } else {
+        notInCorpus = true;
+      }
+    } else if (ev === "delta") {
+      if (notInCorpus) {
+        node.p.textContent = "";
+        node.p.appendChild(cursor);
+        notInCorpus = false;
+      }
+      full += d.text || "";
+      cursor.remove();
+      node.p.textContent = full;
+      node.p.appendChild(cursor);
+      scrollBottom();
+    } else if (ev === "error") {
+      throw new Error(d.detail || "stream error");
+    }
+  }
+
+  cursor.remove();
+  if (notInCorpus && !full) {
+    node.wrap.className = "assistant";
+    node.label.textContent = "answer · not in corpus";
+  }
+  send.disabled = false;
+  question.focus();
+  refreshChats();
+  scrollBottom();
 });
 
-/* ---------- init ---------- */
-refreshHealth(); refreshDocs();
-const themeBtn = document.getElementById("theme");
-function applyTheme(mode) {
-  document.documentElement.dataset.theme = mode;
-  themeBtn.textContent = mode === "dark" ? "☀️ light" : "🌙 dark";
-  try { localStorage.setItem("rag-hybrid-theme", mode); } catch (e) {}
+function addStoredAssistant(text, sources) {
+  const node = assistantShell(sources.length ? "answer · grounded" : "answer");
+  if (!sources.length) {
+    node.label.textContent = "answer · not in corpus";
+    node.p.replaceWith(notInCorpusBox(text));
+    return;
+  }
+  node.p.textContent = text;
+  node.wrap.appendChild(sourcesRow(sources));
 }
-themeBtn.addEventListener("click", () => {
-  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
-});
-(function () {
-  let stored = null;
-  try { stored = localStorage.getItem("rag-hybrid-theme"); } catch (e) {}
-  applyTheme(stored || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
-})();
+
+/* ---------- init ---------- */
+refreshHealth(); refreshDocs(); refreshChats();
 </script>
 </body>
 </html>

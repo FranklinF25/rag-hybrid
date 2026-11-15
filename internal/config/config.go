@@ -40,6 +40,11 @@ type Config struct {
 	RerankTopK           int
 	RerankScoreThreshold float64 // best rerank score below this -> deterministic "not in corpus" (0 disables)
 
+	// Conversations
+	DataDir       string // SQLite store directory (conversations)
+	HistoryTurns  int    // window of recent turns used for rewriting/context
+	RetentionDays int    // purge conversations older than N days (0 = never)
+
 	// Web UI
 	WebHost string
 	WebPort int
@@ -70,6 +75,9 @@ func Load() (*Config, error) {
 		RetrievalTopK:        envInt("RETRIEVAL_TOP_K", 20),
 		RerankTopK:           envInt("RERANK_TOP_K", 5),
 		RerankScoreThreshold: envFloat("RERANK_SCORE_THRESHOLD", 0.4),
+		DataDir:              env("DATA_DIR", ".data"),
+		HistoryTurns:         envInt("HISTORY_TURNS", 4),
+		RetentionDays:        envInt("RETENTION_DAYS", 90),
 		WebHost:              env("WEB_HOST", "127.0.0.1"),
 		WebPort:              envInt("WEB_PORT", 8000),
 	}

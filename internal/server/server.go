@@ -15,6 +15,7 @@ import (
 	"rag-hybrid/internal/config"
 	"rag-hybrid/internal/engine"
 	"rag-hybrid/internal/qdrant"
+	"rag-hybrid/internal/store"
 )
 
 //go:embed static/index.html
@@ -27,17 +28,33 @@ type Server struct {
 	indexer    *engine.Indexer
 	client     *http.Client
 	collection string
+	convs      *store.Store
+	done       chan struct{}
 }
 
-// New builds the server (and its engine wiring) from config.
-func New(cfg *config.Config) *Server {
+// New builds the server (and its engine wiring) from config. It also opens
+// the SQLite conversation store and starts the retention loop; call Close
+// to release both.
+func New(cfg *config.Config) (*Server, error) {
+	convStore, done, err := openStore(cfg.DataDir, cfg.RetentionDays)
+	if err != nil {
+		return nil, fmt.Errorf("opening conversation store: %w", err)
+	}
 	return &Server{
 		cfg:        cfg,
 		searcher:   engine.NewSearcher(cfg),
 		indexer:    engine.NewIndexer(cfg),
 		client:     &http.Client{Timeout: 2 * time.Second},
 		collection: cfg.QdrantCollection,
-	}
+		convs:      convStore,
+		done:       done,
+	}, nil
+}
+
+// Close stops the retention loop and the store.
+func (s *Server) Close() {
+	close(s.done)
+	_ = s.convs.Close()
 }
 
 // Handler returns the routed http.Handler with request logging.
@@ -47,6 +64,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("POST /api/chat", s.handleChat)
+	mux.HandleFunc("POST /api/chat/stream", s.handleChatStream)
+	mux.HandleFunc("GET /api/conversations", s.handleListConversations)
+	mux.HandleFunc("DELETE /api/conversations", s.handleDeleteConversation)
+	mux.HandleFunc("GET /api/conversations/{id}/turns", s.handleConversationTurns)
 	mux.HandleFunc("POST /api/documents", s.handleDocuments)
 	mux.HandleFunc("GET /api/documents", s.handleListDocuments)
 	mux.HandleFunc("DELETE /api/documents", s.handleForget)
@@ -62,6 +83,14 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Flush propagates the Flusher interface through the middleware so SSE
+// streaming works behind request logging.
+func (r *statusRecorder) Flush() {
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // logRequests prints one line per request: method, path, status, duration.
@@ -153,7 +182,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Message string `json:"message"`
+		Message        string `json:"message"`
+		ConversationID string `json:"conversation_id"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
@@ -164,9 +194,24 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "message must not be empty")
 		return
 	}
+
+	conv, history, created, err := s.chatFlow(r, question, body.ConversationID)
+	if err != nil {
+		writeErr(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	_ = s.convs.AppendTurn(r.Context(), conv.ID, "user", question, "[]")
+	if created {
+		title := question
+		if len(title) > 60 {
+			title = title[:60]
+		}
+		_ = s.convs.SetTitle(r.Context(), conv.ID, title)
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 	defer cancel()
-	answer, err := s.searcher.Ask(ctx, question)
+	answer, _, err := s.searcher.AskWithContext(ctx, question, history)
 	if err != nil {
 		writeErr(w, http.StatusServiceUnavailable, err.Error())
 		return
@@ -175,7 +220,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	for _, hit := range answer.Sources {
 		sources = append(sources, toSourceView(hit.Source, hit.Score, hit.Content, false))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"answer": answer.Text, "sources": sources})
+	if sourcesJSON, err := json.Marshal(sources); err == nil {
+		_ = s.convs.AppendTurn(r.Context(), conv.ID, "assistant", answer.Text, string(sourcesJSON))
+	} else {
+		_ = s.convs.AppendTurn(r.Context(), conv.ID, "assistant", answer.Text, "[]")
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"answer": answer.Text, "sources": sources, "conversation_id": conv.ID})
 }
 
 func (s *Server) handleDocuments(w http.ResponseWriter, r *http.Request) {

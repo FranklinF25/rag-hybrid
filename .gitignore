@@ -24,3 +24,6 @@ build/
 
 # deepeval local results
 .deepeval/
+
+# SQLite conversation store
+.data/

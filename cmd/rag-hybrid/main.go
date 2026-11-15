@@ -84,9 +84,14 @@ func cmdServe(args []string) {
 	}
 	addr := fmt.Sprintf("%s:%d", cfg.WebHost, cfg.WebPort)
 	fmt.Printf("rag-hybrid serving on http://%s\n", addr)
+	app, err := server.New(cfg)
+	if err != nil {
+		fatalf("server: %v", err)
+	}
+	defer app.Close()
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg).Handler(),
+		Handler:           app.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil {

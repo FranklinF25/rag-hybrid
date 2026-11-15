@@ -123,6 +123,16 @@ the binary with a public tunnel.
 - **Deterministic "not in corpus"**: when the best rerank score stays below
   `RERANK_SCORE_THRESHOLD` (default 0.4) the system answers without calling
   the LLM — cheaper, faster, no hallucination path.
+## Conversations
+
+Chats persist in embedded SQLite (`DATA_DIR`, default `.data`, mounted as a
+volume in compose) and follow-ups work: the question is rewritten into a
+standalone query against the recent turns (first question of a chat skips
+rewriting entirely), retrieval cites sources from the REWRITTEN query, and
+answers stream token-by-token (SSE). `HISTORY_TURNS` sets the context
+window; `RETENTION_DAYS` (0 = never) drives an hourly purge — deletion as a
+compliance feature, consistent with document `forget`.
+
 ## Notes
 
 - PDFs are supported via a text-layer extractor (pure Go, no cgo): text

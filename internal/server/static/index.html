@@ -115,6 +115,19 @@
     padding: 12px; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap;
     max-height: 300px; overflow-y: auto; margin-top: 8px;
   }
+  .overlay { position: fixed; inset: 0; background: rgba(10,16,28,.55); display: flex; align-items: center; justify-content: center; z-index: 20; }
+  .overlay[hidden] { display: none; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; width: min(420px, 90vw); box-shadow: 0 12px 40px rgba(10,16,28,.25); }
+  .modal h3 { font-size: 16px; margin-bottom: 8px; }
+  .modal p { font-size: 14px; color: var(--muted); margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; }
+  .modal .typehint { color: var(--text); }
+  .modal .typehint b { font-family: ui-monospace, monospace; }
+  .modal input { width: 100%; border: 1px solid var(--input-border); border-radius: 8px; padding: 10px 12px; font: inherit; background: var(--bg); color: var(--text); margin: 8px 0 14px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-actions button { border-radius: 8px; padding: 9px 16px; min-height: 38px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  .modal-actions button:hover { border-color: var(--accent); }
+  .modal-actions #confirmGo { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+  .modal-actions #confirmGo:disabled { opacity: .45; cursor: not-allowed; }
   .cursor { display: inline-block; width: 8px; height: 15px; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
   @keyframes blink { 0% {opacity: 1} 50% {opacity: 0} 100% {opacity: 1} }
   @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
@@ -183,6 +196,19 @@
   </div>
 </section>
 
+<div class="overlay" id="confirmOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmDesc">
+    <h3 id="confirmTitle"></h3>
+    <p id="confirmDesc"></p>
+    <p class="typehint">Type <b>delete</b> to confirm.</p>
+    <input id="confirmInput" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="type delete to confirm">
+    <div class="modal-actions">
+      <button id="confirmCancel" type="button">Cancel</button>
+      <button id="confirmGo" type="button" disabled>Delete</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -190,6 +216,34 @@ const log = $("log"), statusline = $("statusline"), send = $("send"), question =
 let currentConversation = null;
 
 function status(text) { statusline.textContent = text || ""; }
+
+/* type-to-confirm modal for destructive actions */
+function confirmDestructive({ title, desc, onConfirm }) {
+  const overlay = $("confirmOverlay"), input = $("confirmInput"), go = $("confirmGo");
+  const trigger = document.activeElement;
+  $("confirmTitle").textContent = title;
+  $("confirmDesc").textContent = desc;
+  input.value = "";
+  go.disabled = true;
+  overlay.hidden = false;
+  const onInput = () => { go.disabled = input.value.trim().toLowerCase() !== "delete"; };
+  const cleanup = () => {
+    overlay.hidden = true;
+    input.removeEventListener("input", onInput);
+    $("confirmCancel").removeEventListener("click", onCancel);
+    go.removeEventListener("click", onGo);
+    document.removeEventListener("keydown", onKey);
+    if (trigger && trigger.focus) trigger.focus();
+  };
+  const onCancel = () => cleanup();
+  const onGo = () => { cleanup(); onConfirm(); };
+  const onKey = (e) => { if (e.key === "Escape") cleanup(); };
+  input.addEventListener("input", onInput);
+  $("confirmCancel").addEventListener("click", onCancel);
+  go.addEventListener("click", onGo);
+  document.addEventListener("keydown", onKey);
+  input.focus();
+}
 
 /* ---------- theme ---------- */
 const themeBtn = $("theme");
@@ -281,6 +335,13 @@ for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.pre
 drop.addEventListener("drop", (e) => upload(e.dataTransfer.files));
 
 async function forget(source) {
+  confirmDestructive({
+    title: "Forget document?",
+    desc: "This permanently removes every indexed chunk of:\n" + source,
+    onConfirm: () => forgetNow(source),
+  });
+}
+async function forgetNow(source) {
   status("Forgetting " + source + "…");
   try {
     const res = await fetch("/api/documents?source=" + encodeURIComponent(source), { method: "DELETE" });
@@ -318,12 +379,18 @@ function renderChats(convs) {
     meta.addEventListener("click", () => loadConversation(c.id));
     const del = document.createElement("button");
     del.className = "del"; del.textContent = "✕"; del.setAttribute("aria-label", "delete conversation " + (c.title || c.id));
-    del.addEventListener("click", async () => {
-      try {
-        await fetch("/api/conversations?id=" + encodeURIComponent(c.id), { method: "DELETE" });
-        if (currentConversation === c.id) newChat();
-        refreshChats();
-      } catch (e) { status("Error: " + e.message); }
+    del.addEventListener("click", () => {
+      confirmDestructive({
+        title: "Delete conversation?",
+        desc: "This permanently deletes the conversation:\n" + (c.title || c.id),
+        onConfirm: async () => {
+          try {
+            await fetch("/api/conversations?id=" + encodeURIComponent(c.id), { method: "DELETE" });
+            if (currentConversation === c.id) newChat();
+            refreshChats();
+          } catch (e) { status("Error: " + e.message); }
+        },
+      });
     });
     li.append(meta, del);
     list.appendChild(li);

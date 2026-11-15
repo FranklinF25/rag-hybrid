@@ -15,14 +15,17 @@ ChatGPT-style conversation experience on the Go engine: conversations persist in
 
 ## Tasks
 
-- C1 — go.mod dep + feature doc + split — **parent**
-- C2 — internal/store: SQLite store (conversations, turns, CRUD, purge) + tests — **worker C**
-- C3 — internal/engine: DeepSeek streaming (SSE) + RewriteQuery (fast-path) + Turn type + tests — **worker D**
-- C4 — engine integration: Ask with history/rewrite; server endpoints (chat, chat/stream SSE, conversations CRUD); retention loop; config knobs — **parent**
-- C5 — UI: conversations panel, history reload, streaming render — **parent**
-- C6 — E2E: follow-up question that only works with rewrite; streaming via curl; retention purge; README + env.example + commit — **parent**
+- C1 — go.mod dep + feature doc + split — **done** (note: dep was swept by go mod tidy before the importing code existed; re-added at C2 verification)
+- C2 — internal/store: SQLite store + 9 tests — **done (worker C, parent-verified 9/9)**
+- C3 — DeepSeek streaming (SSE) + RewriteQuery + 6 tests — **done (worker D, parent-verified)**
+- C4 — engine staged flow + server endpoints + retention loop + Flush fix — **done**
+- C5 — UI conversations panel + streaming render + searched-as line — **done**
+- C6 — E2E + docs — **done**: dependent follow-up rewritten ('and what value does that constant use?' → 'What value does the constant in Reciprocal Rank Fusion use?'), 21 streamed deltas, 'value 60 [1]'; conversations CRUD verified; sqlite persisted in ./.data. Commit c85cf6a.
 
 ## Log
 
 - L1 (2026-11-14, user): pushed back on ephemeral design ("las conversaciones se pierden no? asi es como funcionan las implementaciones de RAG a empresas?") — parent corrected the plan: durable store from day one, RAM design dropped.
 - L2 (2026-11-14, user): "si dale con el diseño completo".
+- L3 (2026-11-15, results): commit c85cf6a. Incidents: (1) go mod tidy swept modernc.org/sqlite added before internal/store existed — re-added at verification; (2) logging middleware's statusRecorder hid http.Flusher → SSE endpoint returned 500 'streaming unsupported' — fixed with Flush() propagation; (3) scratch container had no writable DATA_DIR → ENV DATA_DIR=/data + compose volume ./.data:/data.
+
+Risk: none — all new code, 5/5 packages tested, in-container E2E including the rewrite chain.

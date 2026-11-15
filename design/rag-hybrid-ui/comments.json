@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "0w8moox6",
+      "file": "02-workbench.html",
+      "selector": "body > section",
+      "excerpt": "Chat hybrid · RRF · rerank-3-lite threshold 0.40 What does RRF stand for and how does it fuse the two ranked lists? ANSWER · GROUNDED RRF stands for Reciprocal Rank Fusion. Each document earns a contribution of 1 / (k + rank) from every list it appears in, where k is a damping constant, typically 60",
+      "comment": "hay que agregarle un boton para modo oscuro",
+      "createdAt": "2026-11-15T13:00:06.817Z",
+      "status": "resolved",
+      "sentAt": "2026-11-15T13:00:06.901Z",
+      "resolvedAt": "2026-11-15T13:01:36.366Z",
+      "resolution": "Added a dark-mode toggle (🌙/☀️) in the chat top bar: full dark palette via CSS variables + data-theme, initial mode follows prefers-color-scheme."
+    }
+  ]
+}

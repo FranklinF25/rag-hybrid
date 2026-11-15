@@ -5,79 +5,107 @@
 <title>rag-hybrid · 02 Workbench</title>
 <style>
   :root { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  :root {
+    --bg: #f7f8fa; --pane: #eef1f5; --card: #ffffff; --border: #e2e7ee;
+    --text: #1a2332; --muted: #5a6b81; --accent: #2f6df6; --on-accent: #ffffff;
+    --ok: #177a4e; --up-dot: #23b26d; --danger: #a04b3c;
+    --pill-bg: #eef1f5; --input-border: #cdd7e3; --drop-border: #b7c2d2;
+    --drop-over-bg: #eef4ff;
+    --warn-bg: #fdf3e7; --warn-border: #f0d9b8; --warn-text: #7a5a2e;
+    --err-bg: #fdecec; --err-border: #f0c4c4; --err-text: #8c3a30;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1420; --pane: #121a28; --card: #1a2332; --border: #263246;
+    --text: #e3ebf5; --muted: #93a3ba; --accent: #5b8cff; --on-accent: #0d1524;
+    --ok: #3fc98a; --up-dot: #3fc98a; --danger: #e08a78;
+    --pill-bg: #1e2939; --input-border: #33415c; --drop-border: #3d4c66;
+    --drop-over-bg: #16233c;
+    --warn-bg: #2a2318; --warn-border: #4a3d26; --warn-text: #e3b877;
+    --err-bg: #2a1a18; --err-border: #552e28; --err-text: #f0a99e;
+  }
   * { box-sizing: border-box; margin: 0; }
   body {
-    background: #f7f8fa; color: #1a2332;
+    background: var(--bg); color: var(--text);
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     min-height: 100vh; display: grid; grid-template-columns: 300px 1fr;
   }
   button { font: inherit; cursor: pointer; }
-  button:focus-visible, input:focus-visible { outline: 2px solid #2f6df6; outline-offset: 2px; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* sidebar: documents */
   aside {
-    background: #eef1f5; border-right: 1px solid #e2e7ee;
+    background: var(--pane); border-right: 1px solid var(--border);
     padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
   }
-  aside h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
-  aside h1 .dot { width: 8px; height: 8px; border-radius: 50%; background: #23b26d; }
+  .brand { display: flex; align-items: center; gap: 8px; }
+  aside h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; flex: 1; }
+  aside h1 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up-dot); }
   .drop {
-    border: 1.5px dashed #b7c2d2; border-radius: 10px; padding: 18px 14px;
-    text-align: center; color: #5a6b81; font-size: 13px; background: #f7f8fa;
+    border: 1.5px dashed var(--drop-border); border-radius: 10px; padding: 18px 14px;
+    text-align: center; color: var(--muted); font-size: 13px; background: var(--bg);
+    transition: border-color 120ms ease, background-color 120ms ease;
   }
-  .drop b { color: #2f6df6; }
-  .docs h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #5a6b81; margin-bottom: 8px; }
+  .drop.over { border-color: var(--accent); background: var(--drop-over-bg); }
+  .drop b { color: var(--accent); }
+  .drop input { display: none; }
+  .drop label { color: var(--accent); cursor: pointer; }
+  .docs h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
   ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-  li { background: #fff; border: 1px solid #e2e7ee; border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+  li { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
   li .meta { min-width: 0; flex: 1; }
   li .name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  li .sub { font-size: 12px; color: #5a6b81; }
-  .forget {
-    border: 0; background: none; color: #a04b3c; font-size: 12px; padding: 8px; min-width: 44px; min-height: 44px;
-  }
+  li .sub { font-size: 12px; color: var(--muted); }
+  .forget { border: 0; background: none; color: var(--danger); font-size: 12px; padding: 10px; min-width: 44px; min-height: 44px; }
   .forget:hover { text-decoration: underline; }
-  aside footer { margin-top: auto; font-size: 12px; color: #5a6b81; border-top: 1px solid #e2e7ee; padding-top: 12px; }
-  aside footer .ok { color: #177a4e; font-weight: 600; }
+  .empty { font-size: 13px; color: var(--muted); background: var(--card); border: 1px dashed var(--drop-border); border-radius: 8px; padding: 14px; }
+  aside footer { margin-top: auto; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 12px; }
+  aside footer .ok { color: var(--ok); font-weight: 600; }
+  aside footer .bad { color: var(--danger); font-weight: 600; }
 
   /* chat pane */
   section { display: flex; flex-direction: column; min-width: 0; }
-  .top {
-    display: flex; align-items: center; gap: 12px; padding: 16px 28px;
-    border-bottom: 1px solid #e2e7ee; background: #fff;
-  }
+  .top { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid var(--border); background: var(--card); flex-wrap: wrap; }
   .top h2 { font-size: 15px; font-weight: 600; }
-  .pill { font-size: 12px; color: #5a6b81; background: #eef1f5; border-radius: 999px; padding: 4px 12px; }
+  .pill { font-size: 12px; color: var(--muted); background: var(--pill-bg); border-radius: 999px; padding: 4px 12px; }
   .top .spacer { flex: 1; }
+  #theme { border: 0; background: var(--pill-bg); color: var(--muted); border-radius: 999px; padding: 6px 14px; min-height: 32px; }
+  #theme:hover { color: var(--text); }
 
   .log { flex: 1; overflow-y: auto; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 900px; width: 100%; margin: 0 auto; }
-  .user { align-self: flex-end; max-width: 75%; background: #2f6df6; color: #fff; border-radius: 14px 14px 4px 14px; padding: 12px 16px; }
+  .user { align-self: flex-end; max-width: 75%; background: var(--accent); color: var(--on-accent); border-radius: 14px 14px 4px 14px; padding: 12px 16px; }
   .assistant { max-width: 85%; }
-  .assistant .label { font-size: 12px; font-weight: 600; color: #5a6b81; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; }
-  .assistant p { background: #fff; border: 1px solid #e2e7ee; border-radius: 4px 14px 14px 14px; padding: 14px 16px; }
-  .assistant p sup { color: #2f6df6; font-weight: 600; }
+  .assistant .label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; }
+  .assistant p { background: var(--card); border: 1px solid var(--border); border-radius: 4px 14px 14px 14px; padding: 14px 16px; }
+  .assistant p sup { color: var(--accent); font-weight: 600; }
   .sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-left: 4px; }
-  .sources .s { font-size: 12.5px; color: #38465c; background: #eef1f5; border-radius: 999px; padding: 5px 12px; }
-  .sources .s b { color: #177a4e; font-weight: 600; }
-  .nomatch {
-    background: #fdf3e7; border: 1px solid #f0d9b8; color: #7a5a2e;
-    border-radius: 4px 14px 14px 14px; padding: 14px 16px; font-size: 14px;
-  }
-  .nomatch .why { display: block; margin-top: 6px; font-size: 12.5px; color: #7a5a2e; }
+  .sources .s { font-size: 12.5px; color: var(--text); background: var(--pill-bg); border-radius: 999px; padding: 5px 12px; }
+  .sources .s b { color: var(--ok); font-weight: 600; }
+  .nomatch { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); border-radius: 4px 14px 14px 14px; padding: 14px 16px; font-size: 14px; }
+  .nomatch .why { display: block; margin-top: 6px; font-size: 12.5px; color: var(--warn-text); }
 
   /* composer */
-  .composer { border-top: 1px solid #e2e7ee; background: #fff; padding: 16px 28px 20px; }
+  .composer { border-top: 1px solid var(--border); background: var(--card); padding: 16px 28px 20px; }
   .composer form { max-width: 900px; margin: 0 auto; display: flex; gap: 10px; }
-  .composer input { flex: 1; border: 1px solid #cdd7e3; border-radius: 10px; padding: 13px 16px; font: inherit; background: #fff; }
-  .composer button[type="submit"] { background: #2f6df6; color: #fff; border: 0; border-radius: 10px; padding: 13px 24px; font-weight: 600; }
-  .hint { max-width: 900px; margin: 8px auto 0; font-size: 12px; color: #5a6b81; }
+  .composer input { flex: 1; border: 1px solid var(--input-border); border-radius: 10px; padding: 13px 16px; font: inherit; background: var(--card); color: var(--text); }
+  .composer input::placeholder { color: var(--muted); }
+  .composer button[type="submit"] { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 10px; padding: 13px 24px; font-weight: 600; }
+  .hint { max-width: 900px; margin: 8px auto 0; font-size: 12px; color: var(--muted); }
   @media (prefers-reduced-motion: no-preference) { .composer button:hover { filter: brightness(1.05); } }
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--border); padding: 16px 20px; }
+    aside footer { display: none; }
+  }
 </style>
 </head>
 <body>
 <aside aria-label="indexed documents">
-  <h1><span class="dot" aria-hidden="true"></span> rag-hybrid</h1>
+  <div class="brand">
+    <h1><span class="dot" aria-hidden="true"></span> rag-hybrid</h1>
+  </div>
   <div class="drop" tabindex="0">
-    <b>Drop files</b> or use <label for="upload" style="color:#2f6df6; cursor:pointer">choose files</label>
+    <b>Drop files</b> or use <label for="upload" style="color:var(--accent); cursor:pointer">choose files</label>
     <input id="upload" type="file" multiple accept=".md,.txt,.rst,.pdf" hidden>
     <div>.md · .txt · .rst · .pdf</div>
   </div>
@@ -111,6 +139,7 @@
     <span class="pill">hybrid · RRF · rerank-3-lite</span>
     <span class="spacer"></span>
     <span class="pill">threshold 0.40</span>
+    <button id="theme" aria-label="Toggle dark mode">🌙 dark</button>
   </div>
 
   <div class="log" aria-label="conversation">
@@ -145,12 +174,18 @@
     <p class="hint">Answers cite their sources. Upload replaces a file's previous chunks; Forget removes them.</p>
   </div>
 </section>
-<style>
-  @media (max-width: 900px) {
-    body { grid-template-columns: 1fr; }
-    aside { border-right: 0; border-bottom: 1px solid #e2e7ee; padding: 16px 20px; }
-    aside footer { display: none; }
-  }
-</style>
+
+<script>
+"use strict";
+const themeBtn = document.getElementById("theme");
+function applyTheme(mode) {
+  document.documentElement.dataset.theme = mode;
+  themeBtn.textContent = mode === "dark" ? "☀️ light" : "🌙 dark";
+}
+themeBtn.addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
+applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+</script>
 </body>
 </html>

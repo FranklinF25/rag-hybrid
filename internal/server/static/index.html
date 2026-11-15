@@ -218,13 +218,16 @@ let currentConversation = null;
 function status(text) { statusline.textContent = text || ""; }
 
 /* type-to-confirm modal for destructive actions */
-function confirmDestructive({ title, desc, onConfirm }) {
+function confirmDestructive({ title, desc, onConfirm, ...opts }) {
   const overlay = $("confirmOverlay"), input = $("confirmInput"), go = $("confirmGo");
   const trigger = document.activeElement;
   $("confirmTitle").textContent = title;
   $("confirmDesc").textContent = desc;
+  const typed = opts.typed !== false; // default: type-to-confirm
+  input.hidden = !typed;
+  document.querySelector(".modal .typehint").hidden = !typed;
   input.value = "";
-  go.disabled = true;
+  go.disabled = typed; // button-only mode starts enabled
   overlay.hidden = false;
   const onInput = () => { go.disabled = input.value.trim().toLowerCase() !== "delete"; };
   const cleanup = () => {
@@ -242,7 +245,7 @@ function confirmDestructive({ title, desc, onConfirm }) {
   $("confirmCancel").addEventListener("click", onCancel);
   go.addEventListener("click", onGo);
   document.addEventListener("keydown", onKey);
-  input.focus();
+  (typed ? input : go).focus();
 }
 
 /* ---------- theme ---------- */
@@ -383,6 +386,7 @@ function renderChats(convs) {
       confirmDestructive({
         title: "Delete conversation?",
         desc: "This permanently deletes the conversation:\n" + (c.title || c.id),
+        typed: false,
         onConfirm: async () => {
           try {
             await fetch("/api/conversations?id=" + encodeURIComponent(c.id), { method: "DELETE" });

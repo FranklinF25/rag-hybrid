@@ -99,6 +99,22 @@
   .sources .s b { color: var(--ok); font-weight: 600; }
   .nomatch { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); border-radius: 4px 14px 14px 14px; padding: 14px 16px; font-size: 14px; }
   .error { background: var(--err-bg); border: 1px solid var(--err-border); color: var(--err-text); border-radius: 4px 14px 14px 14px; padding: 14px 16px; font-size: 14px; }
+  .feedback { display: flex; gap: 6px; margin-top: 8px; padding-left: 4px; }
+  .feedback button {
+    border: 1px solid var(--border); background: var(--card); color: var(--muted);
+    border-radius: 8px; padding: 6px 12px; min-height: 36px; font-size: 14px;
+  }
+  .feedback button:hover { color: var(--text); border-color: var(--accent); }
+  .feedback button.chosen { color: var(--ok); border-color: var(--ok); }
+  .feedback button:disabled { opacity: .7; cursor: default; }
+  .feedback .thanks { font-size: 12px; color: var(--muted); align-self: center; }
+  details.chunk { margin-top: 6px; }
+  details.chunk summary { cursor: pointer; }
+  details.chunk pre {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap;
+    max-height: 300px; overflow-y: auto; margin-top: 8px;
+  }
   .cursor { display: inline-block; width: 8px; height: 15px; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
   @keyframes blink { 0% {opacity: 1} 50% {opacity: 0} 100% {opacity: 1} }
   @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
@@ -359,12 +375,45 @@ function assistantShell(labelText) {
 function sourcesRow(sources) {
   const row = document.createElement("div"); row.className = "sources";
   for (const s of sources) {
-    const chip = document.createElement("span"); chip.className = "s";
-    chip.title = s.preview || "";
-    const score = document.createElement("b"); score.textContent = Number(s.score).toFixed(3);
-    chip.append(score, " " + s.source);
-    row.appendChild(chip);
+    const full = (s.content && s.content.length) ? s.content : null;
+    if (full) {
+      const det = document.createElement("details"); det.className = "s chunk";
+      const sum = document.createElement("summary");
+      const score = document.createElement("b"); score.textContent = Number(s.score).toFixed(3);
+      sum.append(score, " " + s.source);
+      const pre = document.createElement("pre"); pre.textContent = full;
+      det.append(sum, pre);
+      row.appendChild(det);
+    } else {
+      const chip = document.createElement("span"); chip.className = "s";
+      chip.title = s.preview || "";
+      const score = document.createElement("b"); score.textContent = Number(s.score).toFixed(3);
+      chip.append(score, " " + s.source);
+      row.appendChild(chip);
+    }
   }
+  return row;
+}
+
+function feedbackRow(conversationId, question, answerText, sources) {
+  const row = document.createElement("div"); row.className = "feedback";
+  const send = (rating, btn) => {
+    fetch("/api/feedback", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId, rating, question, answer: answerText, sources }),
+    }).then((res) => res.json()).then((d) => {
+      row.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      btn.classList.add("chosen");
+      const thanks = document.createElement("span"); thanks.className = "thanks";
+      thanks.textContent = "thanks — feedback recorded";
+      row.appendChild(thanks);
+    }).catch(() => {});
+  };
+  const up = document.createElement("button"); up.textContent = "👍"; up.setAttribute("aria-label", "good answer");
+  up.addEventListener("click", () => send("up", up));
+  const down = document.createElement("button"); down.textContent = "👎"; down.setAttribute("aria-label", "bad answer");
+  down.addEventListener("click", () => send("down", down));
+  row.append(up, down);
   return row;
 }
 function notInCorpusBox(text) {
@@ -391,6 +440,8 @@ $("askform").addEventListener("submit", async (e) => {
   node.p.appendChild(cursor);
   let full = "";
   let notInCorpus = false;
+  let streamSources = [];
+  let streamConv = currentConversation;
 
   try {
     const res = await fetch("/api/chat/stream", {
@@ -430,15 +481,16 @@ $("askform").addEventListener("submit", async (e) => {
   }
 
   function handleEvent(ev, d) {
-    if (ev === "conversation") { currentConversation = d.id; }
+    if (ev === "conversation") { currentConversation = d.id; streamConv = d.id; }
     else if (ev === "rewritten") {
       if (d.query && d.query !== message) {
         node.searched.hidden = false;
         node.searched.textContent = "searched as: " + d.query;
       }
     } else if (ev === "sources") {
-      if (d.sources && d.sources.length) {
-        node.wrap.appendChild(sourcesRow(d.sources));
+      streamSources = d.sources || [];
+      if (streamSources.length) {
+        node.wrap.appendChild(sourcesRow(streamSources));
         scrollBottom();
       } else {
         notInCorpus = true;
@@ -463,6 +515,8 @@ $("askform").addEventListener("submit", async (e) => {
   if (notInCorpus && !full) {
     node.wrap.className = "assistant";
     node.label.textContent = "answer · not in corpus";
+  } else {
+    node.wrap.appendChild(feedbackRow(streamConv, message, full, streamSources));
   }
   send.disabled = false;
   question.focus();

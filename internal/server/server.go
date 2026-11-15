@@ -65,6 +65,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("POST /api/chat", s.handleChat)
 	mux.HandleFunc("POST /api/chat/stream", s.handleChatStream)
+	mux.HandleFunc("POST /api/feedback", s.handleFeedback)
 	mux.HandleFunc("GET /api/conversations", s.handleListConversations)
 	mux.HandleFunc("DELETE /api/conversations", s.handleDeleteConversation)
 	mux.HandleFunc("GET /api/conversations/{id}/turns", s.handleConversationTurns)
@@ -218,7 +219,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	sources := make([]sourceView, 0, len(answer.Sources))
 	for _, hit := range answer.Sources {
-		sources = append(sources, toSourceView(hit.Source, hit.Score, hit.Content, false))
+		sources = append(sources, toSourceView(hit.Source, hit.Score, hit.Content, true))
 	}
 	if sourcesJSON, err := json.Marshal(sources); err == nil {
 		_ = s.convs.AppendTurn(r.Context(), conv.ID, "assistant", answer.Text, string(sourcesJSON))

@@ -209,7 +209,7 @@ func (s *Server) handleChatStream(w http.ResponseWriter, r *http.Request) {
 	send("rewritten", map[string]string{"query": rewritten})
 	views := make([]sourceView, 0, len(hits))
 	for _, hit := range hits {
-		views = append(views, toSourceView(hit.Source, hit.Score, hit.Content, false))
+		views = append(views, toSourceView(hit.Source, hit.Score, hit.Content, true))
 	}
 	send("sources", map[string]any{"sources": views})
 
@@ -234,4 +234,31 @@ func (s *Server) handleChatStream(w http.ResponseWriter, r *http.Request) {
 		_ = s.convs.AppendTurn(r.Context(), conv.ID, "assistant", answerText, "[]")
 	}
 	send("done", map[string]string{"conversation_id": conv.ID})
+}
+
+// handleFeedback records a thumbs up/down on an exchange (golden-set mining).
+func (s *Server) handleFeedback(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ConversationID string       `json:"conversation_id"`
+		Rating         string       `json:"rating"`
+		Question       string       `json:"question"`
+		Answer         string       `json:"answer"`
+		Sources        []sourceView `json:"sources"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<20)).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
+		return
+	}
+	if body.Rating != "up" && body.Rating != "down" {
+		writeErr(w, http.StatusBadRequest, "rating must be 'up' or 'down'")
+		return
+	}
+	sourcesJSON, _ := json.Marshal(body.Sources)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := s.convs.SaveFeedback(ctx, body.ConversationID, body.Rating, body.Question, body.Answer, string(sourcesJSON)); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"recorded": body.Rating})
 }

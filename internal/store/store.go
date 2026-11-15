@@ -51,6 +51,15 @@ var schema = []string{
 		created_at INTEGER NOT NULL,
 		updated_at INTEGER NOT NULL
 	)`,
+	`CREATE TABLE IF NOT EXISTS feedback (
+		id              INTEGER PRIMARY KEY AUTOINCREMENT,
+		conversation_id TEXT NOT NULL DEFAULT '',
+		rating          TEXT NOT NULL CHECK(rating IN ('up','down')),
+		question        TEXT NOT NULL DEFAULT '',
+		answer          TEXT NOT NULL DEFAULT '',
+		sources         TEXT NOT NULL DEFAULT '[]',
+		created_at      INTEGER NOT NULL
+	)`,
 	`CREATE TABLE IF NOT EXISTS turns (
 		id              INTEGER PRIMARY KEY AUTOINCREMENT,
 		conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -264,4 +273,50 @@ func newConversationID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
+}
+
+// Feedback is one user rating of an answer (golden-set mining).
+type Feedback struct {
+	ID             int64  `json:"id"`
+	ConversationID string `json:"conversation_id"`
+	Rating         string `json:"rating"` // "up" | "down"
+	Question       string `json:"question"`
+	Answer         string `json:"answer"`
+	Sources        string `json:"sources"`
+	CreatedAt      int64  `json:"created_at"`
+}
+
+// SaveFeedback records a thumbs up/down for an exchange.
+func (s *Store) SaveFeedback(ctx context.Context, conversationID, rating, question, answer, sourcesJSON string) error {
+	if rating != "up" && rating != "down" {
+		return fmt.Errorf("rating must be up or down, got %q", rating)
+	}
+	if sourcesJSON == "" {
+		sourcesJSON = "[]"
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO feedback (conversation_id, rating, question, answer, sources, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		conversationID, rating, question, answer, sourcesJSON, time.Now().Unix())
+	return err
+}
+
+// ListFeedback returns recorded feedback, newest first.
+func (s *Store) ListFeedback(ctx context.Context, limit int) ([]Feedback, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, conversation_id, rating, question, answer, sources, created_at
+		 FROM feedback ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []Feedback
+	for rows.Next() {
+		var f Feedback
+		if err := rows.Scan(&f.ID, &f.ConversationID, &f.Rating, &f.Question, &f.Answer, &f.Sources, &f.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, f)
+	}
+	return list, rows.Err()
 }

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -354,4 +355,65 @@ func (c *Client) DeleteBySource(ctx context.Context, source string) error {
 		return nil // collection gone: nothing to delete
 	}
 	return c.statusError(http.MethodPost, path, status, body)
+}
+
+// SourceStat aggregates the chunk count of one indexed source file.
+type SourceStat struct {
+	Source string `json:"source"`
+	Chunks int    `json:"chunks"`
+}
+
+// ListSources returns every distinct payload source with its chunk count,
+// ordered by chunks descending (scrolls sources only, no vectors).
+func (c *Client) ListSources(ctx context.Context) ([]SourceStat, error) {
+	path := "/collections/" + c.collection + "/points/scroll"
+	counts := make(map[string]int)
+	var cursor *string
+	for {
+		payload := map[string]any{
+			"limit":        256,
+			"with_payload": []string{"source"},
+		}
+		if cursor != nil {
+			payload["offset"] = *cursor
+		}
+		status, body, err := c.do(ctx, http.MethodPost, path, payload)
+		if err != nil {
+			return nil, err
+		}
+		if status < 200 || status >= 300 {
+			return nil, c.statusError(http.MethodPost, path, status, body)
+		}
+		var parsed struct {
+			Result struct {
+				Points []struct {
+					Payload struct {
+						Source string `json:"source"`
+					} `json:"payload"`
+				} `json:"points"`
+				NextPageOffset *string `json:"next_page_offset"`
+			} `json:"result"`
+		}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return nil, fmt.Errorf("decoding scroll response: %w", err)
+		}
+		for _, point := range parsed.Result.Points {
+			counts[point.Payload.Source]++
+		}
+		if parsed.Result.NextPageOffset == nil {
+			break
+		}
+		cursor = parsed.Result.NextPageOffset
+	}
+	stats := make([]SourceStat, 0, len(counts))
+	for source, chunks := range counts {
+		stats = append(stats, SourceStat{Source: source, Chunks: chunks})
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].Chunks != stats[j].Chunks {
+			return stats[i].Chunks > stats[j].Chunks
+		}
+		return stats[i].Source < stats[j].Source
+	})
+	return stats, nil
 }

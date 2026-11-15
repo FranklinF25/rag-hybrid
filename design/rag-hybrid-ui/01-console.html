@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>rag-hybrid · 01 Console</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #0a0e14; color: #d6e2f0;
+    font: 14px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  a { color: inherit; }
+  button { font: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #ffb454; outline-offset: 2px; }
+
+  /* top bar */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 24px; border-bottom: 1px solid #1d2634; background: #0c1118;
+  }
+  header .dot { width: 9px; height: 9px; border-radius: 50%; background: #7fd962; }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+  header .v { color: #7a8ca3; }
+  .chips { margin-left: auto; display: flex; gap: 8px; }
+  .chip {
+    border: 1px solid #2a3648; border-radius: 4px; padding: 3px 10px;
+    color: #a8bad0; font-size: 12px; display: inline-flex; gap: 6px; align-items: center;
+  }
+  .chip b { color: #d6e2f0; font-weight: 600; }
+  .chip .ok { color: #7fd962; }
+
+  /* log */
+  main { flex: 1; overflow-y: auto; padding: 24px; max-width: 980px; width: 100%; margin: 0 auto; }
+  .turn { margin-bottom: 22px; }
+  .role { font-size: 12px; letter-spacing: .08em; margin-bottom: 6px; }
+  .role.you { color: #ffb454; }
+  .role.rag { color: #7fd962; }
+  .role.sys { color: #7a8ca3; }
+  .body { white-space: pre-wrap; }
+  .ref { color: #ffb454; }
+
+  /* sources table */
+  table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+  caption { text-align: left; color: #7a8ca3; font-size: 12px; padding-bottom: 6px; }
+  th { text-align: left; color: #7a8ca3; font-weight: 400; font-size: 12px; padding: 4px 14px 4px 0; border-bottom: 1px solid #1d2634; }
+  td { padding: 6px 14px 6px 0; border-bottom: 1px solid #131a25; font-size: 13px; }
+  td.score { color: #7fd962; text-align: right; padding-right: 0; }
+  td.file { color: #a8bad0; }
+  .bar { display: inline-block; width: 120px; height: 4px; background: #1d2634; border-radius: 2px; margin-left: 8px; vertical-align: middle; }
+  .bar i { display: block; height: 4px; border-radius: 2px; background: #7fd962; }
+
+  /* negative state */
+  .nomatch { border-left: 2px solid #5b6b82; padding: 8px 14px; color: #a8bad0; background: #10161f; }
+
+  /* command bar */
+  form { border-top: 1px solid #1d2634; background: #0c1118; padding: 14px 24px 18px; }
+  .cmdrow { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .utils { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .utils button, .utils label, .utils input[type="text"] {
+    background: #11161f; color: #a8bad0; border: 1px solid #2a3648;
+    border-radius: 4px; padding: 8px 14px; font-size: 12.5px; min-height: 36px;
+  }
+  .utils button:hover { color: #d6e2f0; border-color: #3d4c66; }
+  .utils input[type="text"] { width: 180px; }
+  .utils input[type="file"] { display: none; }
+  .utils label { cursor: pointer; }
+  .ask { display: flex; gap: 10px; }
+  .ask input[type="text"] {
+    flex: 1; background: #11161f; border: 1px solid #2a3648; border-radius: 4px;
+    color: #d6e2f0; padding: 12px 14px; font-size: 14px;
+  }
+  .ask button { background: #ffb454; color: #1a1206; border: 0; border-radius: 4px; padding: 12px 22px; font-weight: 700; cursor: pointer; }
+  footer { color: #6b7d94; font-size: 12px; text-align: center; padding: 10px; }
+  @media (prefers-reduced-motion: no-preference) { .ask button:hover { filter: brightness(1.08); } }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" aria-hidden="true"></span>
+  <h1>rag-hybrid</h1>
+  <span class="v">v0.1 · go</span>
+  <div class="chips" aria-label="service health">
+    <span class="chip"><span class="ok">✓</span> qdrant <b>26</b> chunks</span>
+    <span class="chip"><span class="ok">✓</span> openrouter</span>
+    <span class="chip"><span class="ok">✓</span> deepseek</span>
+  </div>
+</header>
+
+<main aria-label="conversation">
+  <div class="turn">
+    <div class="role sys">indexed · Flores-Franklin-2do-Avance.pdf → 20 chunks (replaced previous)</div>
+  </div>
+
+  <div class="turn">
+    <div class="role you">you ›</div>
+    <p class="body">What does RRF stand for and how does it fuse the two ranked lists?</p>
+  </div>
+
+  <div class="turn">
+    <div class="role rag">rag ›</div>
+    <p class="body">RRF stands for Reciprocal Rank Fusion. Each document earns a contribution of
+1 / (k + rank) from every list it appears in, where k is a damping constant,
+typically <span class="ref">60</span>. A document ranked high in both lists accumulates the most
+score, and no normalization is needed because RRF only uses ranks <span class="ref">[1]</span>.</p>
+    <table>
+      <caption>sources · rerank-3-lite</caption>
+      <thead><tr><th scope="col">score</th><th scope="col">document</th></tr></thead>
+      <tbody>
+        <tr><td class="score">0.983<span class="bar"><i style="width:98%"></i></span></td><td class="file">sample/hybrid-retrieval.md</td></tr>
+        <tr><td class="score">0.454<span class="bar"><i style="width:45%"></i></span></td><td class="file">sample/rag-hybrid-overview.md</td></tr>
+        <tr><td class="score">0.289<span class="bar"><i style="width:29%"></i></span></td><td class="file">go-e2e.md</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="turn">
+    <div class="role you">you ›</div>
+    <p class="body">What is the capital of France?</p>
+  </div>
+
+  <div class="turn">
+    <div class="role rag">rag › (threshold 0.40)</div>
+    <p class="nomatch">no relevant documents (best score 0.35) — answered locally, no generation call</p>
+  </div>
+</main>
+
+<form aria-label="ask and manage">
+  <div class="cmdrow">
+    <div class="utils">
+      <label for="upload">+ upload (.md .txt .rst .pdf)</label>
+      <input id="upload" type="file" multiple>
+      <input type="text" placeholder="forget file…" aria-label="file name to forget">
+      <button type="button">forget</button>
+    </div>
+    <div class="ask">
+      <input type="text" placeholder="ask your documents…" aria-label="question">
+      <button type="submit">send ⏎</button>
+    </div>
+  </div>
+</form>
+<footer>upload documents to index them · answers cite their sources · delete by source with forget</footer>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "02-workbench.html",
+  "handoffs": {
+    "02-workbench.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-14T15:14:34.876Z",
+      "startedAt": "2026-11-14T15:15:18.003Z",
+      "implementedAt": "2026-11-14T15:17:11.383Z",
+      "note": "Workbench UI implemented in the embedded index.html: documents sidebar (live GET /api/documents with chunk counts, per-file forget), drag&drop + click upload (.md/.txt/.rst/.pdf), source chips with scores, deterministic not-in-corpus state, health pills, request-threshold pill, responsive stack under 900px. New endpoint ListSources via Qdrant scroll. 4/4 packages tested; container rebuilt.",
+      "previewUrl": "http://127.0.0.1:8000/"
+    }
+  }
+}

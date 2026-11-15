@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("POST /api/chat", s.handleChat)
 	mux.HandleFunc("POST /api/documents", s.handleDocuments)
+	mux.HandleFunc("GET /api/documents", s.handleListDocuments)
 	mux.HandleFunc("DELETE /api/documents", s.handleForget)
 	return logRequests(mux)
 }
@@ -219,6 +220,23 @@ func (s *Server) handleDocuments(w http.ResponseWriter, r *http.Request) {
 		"chunks":  result.Chunks,
 		"skipped": result.Skipped,
 	})
+}
+
+// handleListDocuments returns every indexed source with its chunk count.
+func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	client := qdrant.NewClient(s.cfg.QdrantURL, s.cfg.QdrantAPIKey, s.cfg.QdrantCollection)
+	stats, err := client.ListSources(ctx)
+	if err != nil {
+		writeErr(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	total := 0
+	for _, stat := range stats {
+		total += stat.Chunks
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"documents": stats, "chunks": total})
 }
 
 // handleForget removes every chunk of one source file: DELETE /api/documents?source=name

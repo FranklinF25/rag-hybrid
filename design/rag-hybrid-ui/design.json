@@ -1,0 +1,27 @@
+{
+  "title": "rag-hybrid web UI",
+  "brief": "Redesign the rag-hybrid chat web UI (Go binary, embedded single file): chat with grounded answers and rerank-scored sources, upload .md/.txt/.rst/.pdf, forget by source, health badge, deterministic not-in-corpus state. All functionality of the current app must remain represented.",
+  "artboards": [
+    {
+      "file": "01-console.html",
+      "title": "Engineering console",
+      "tradeoff": "Dense, terminal-grade credibility that matches the Go identity; colder and less approachable for non-technical viewers",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-workbench.html",
+      "title": "Document workbench",
+      "tradeoff": "Document lifecycle is first-class (sidebar with per-file forget and dropzone); chat loses width and the chrome is heavier",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-editorial.html",
+      "title": "Editorial reader",
+      "tradeoff": "Best reading experience and portfolio elegance (serif answers, endnote sources); management features hide behind the ⋯ menu, less discoverable",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>rag-hybrid · 03 Editorial</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #faf9f6; color: #23201a;
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  button { font: inherit; cursor: pointer; background: none; border: 0; color: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #8a4b2f; outline-offset: 2px; }
+
+  /* slim top bar */
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 32px; border-bottom: 1px solid #e8e4dc; position: relative;
+  }
+  header h1 { font: 600 16px system-ui, sans-serif; letter-spacing: .01em; }
+  header .wordmark { color: #8a4b2f; }
+  .status { margin-left: auto; font-size: 12.5px; color: #6f695e; }
+  .status .ok { color: #3d6b4f; }
+  .menu { position: relative; }
+  .menu > button { font-size: 18px; padding: 10px 14px; min-width: 44px; min-height: 44px; border-radius: 8px; }
+  .menu > button:hover, .menu > button:focus-visible { background: #efece5; }
+  .popover {
+    position: absolute; right: 0; top: 48px; width: 280px; background: #fff;
+    border: 1px solid #e8e4dc; border-radius: 12px; box-shadow: 0 8px 28px rgba(35,32,26,.10);
+    padding: 8px; z-index: 2;
+  }
+  .popover .item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 11px 12px; border-radius: 8px; font-size: 14px; min-height: 44px; text-align: left;
+  }
+  .popover .item:hover, .popover .item:focus-visible { background: #f4f1ea; }
+  .popover .item small { margin-left: auto; color: #6f695e; font-size: 12px; }
+  .popover hr { border: 0; border-top: 1px solid #efece5; margin: 6px 4px; }
+  .popover .hint { font-size: 12px; color: #6f695e; padding: 8px 12px 6px; }
+
+  /* reading column */
+  main { max-width: 720px; margin: 0 auto; padding: 44px 24px 30px; }
+  .q { display: flex; gap: 12px; margin-bottom: 26px; }
+  .q .tag, .a .tag {
+    flex: none; font-size: 11.5px; font-weight: 700; letter-spacing: .14em;
+    color: #6f695e; padding-top: 5px;
+  }
+  .q p { font-size: 16.5px; font-weight: 600; }
+  .a .tag { color: #8a4b2f; }
+  .a .answer {
+    font: 17.5px/1.75 Georgia, "Times New Roman", serif;
+  }
+  .a .answer sup { font-family: system-ui, sans-serif; font-size: 11px; color: #8a4b2f; font-weight: 700; }
+  .a .answer .num { font-weight: 700; }
+
+  /* endnotes */
+  .notes { margin-top: 26px; border-top: 1px solid #e8e4dc; padding-top: 16px; }
+  .notes h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #6f695e; margin-bottom: 10px; }
+  .notes ol { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .notes li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; }
+  .notes .n { color: #8a4b2f; font-weight: 700; min-width: 18px; }
+  .notes .file { color: #23201a; }
+  .notes .sc { color: #3d6b4f; font-size: 12.5px; margin-left: auto; }
+  .notes .irrelevant .sc { color: #6f695e; }
+
+  /* local answer state */
+  .local {
+    margin-top: 10px; background: #f4f1ea; border-left: 3px solid #b3a88f;
+    padding: 12px 16px; font: 15px/1.6 Georgia, serif; color: #4f4a40;
+  }
+  .local small { display: block; margin-top: 6px; font: 12px system-ui, sans-serif; color: #6f695e; }
+
+  /* composer */
+  form { max-width: 720px; margin: 0 auto; padding: 0 24px 40px; display: flex; gap: 12px; }
+  form input {
+    flex: 1; border: 1px solid #d8d2c6; background: #fff; border-radius: 999px;
+    padding: 14px 22px; font: inherit; color: inherit;
+  }
+  form button { border-radius: 999px; background: #23201a; color: #faf9f6; padding: 14px 26px; font-weight: 600; }
+  footer { text-align: center; font-size: 12.5px; color: #6f695e; padding-bottom: 26px; }
+  @media (prefers-reduced-motion: no-preference) { form button:hover { background: #8a4b2f; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="wordmark">rag·</span>hybrid</h1>
+  <span class="status"><span class="ok">●</span> 26 chunks · qdrant ✓ · keys ✓</span>
+  <nav class="menu" aria-label="document management">
+    <button aria-haspopup="true" aria-expanded="true" aria-label="document management menu">⋯</button>
+    <div class="popover" role="menu">
+      <p class="hint">Indexed documents · 26 chunks</p>
+      <button class="item" role="menuitem">Upload files <small>.md .txt .rst .pdf</small></button>
+      <button class="item" role="menuitem">Forget a document… <small>by name</small></button>
+      <hr>
+      <button class="item" role="menuitem">Relevance threshold <small>0.40</small></button>
+    </div>
+  </nav>
+</header>
+
+<main aria-label="conversation">
+  <div class="q">
+    <span class="tag">Q</span>
+    <p>What does RRF stand for and how does it fuse the two ranked lists?</p>
+  </div>
+  <div class="a">
+    <span class="tag">A</span>
+    <p class="answer">
+      RRF stands for <span class="num">Reciprocal Rank Fusion</span>. Each document earns a
+      contribution of 1 / (k + rank) from every list it appears in, where k is a damping
+      constant — typically <span class="num">60</span>. A document ranked high in both lists
+      accumulates the most score, and no score normalization is needed, because RRF only
+      uses ranks.<sup>[1]</sup>
+    </p>
+    <div class="notes" aria-label="sources">
+      <h2>Sources</h2>
+      <ol>
+        <li><span class="n">[1]</span> <span class="file">sample/hybrid-retrieval.md</span><span class="sc">0.983</span></li>
+        <li><span class="n">[2]</span> <span class="file">sample/rag-hybrid-overview.md</span><span class="sc">0.454</span></li>
+        <li class="irrelevant"><span class="n">[3]</span> <span class="file">go-e2e.md</span><span class="sc">retrieved, low relevance</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="q" style="margin-top:40px">
+    <span class="tag">Q</span>
+    <p>What is the capital of France?</p>
+  </div>
+  <div class="a">
+    <span class="tag">A</span>
+    <div class="local">
+      I don't have relevant indexed documents for that question (best relevance 0.35).
+      <small>Below the 0.40 threshold — answered locally without a generation call.</small>
+    </div>
+  </div>
+</main>
+
+<form aria-label="ask">
+  <input type="text" placeholder="Ask your documents…" aria-label="question">
+  <button type="submit">Ask</button>
+</form>
+<footer>Upload documents to index them · answers cite their sources · re-uploading replaces a file's chunks</footer>
+</body>
+</html>

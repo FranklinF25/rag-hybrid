@@ -81,14 +81,20 @@ docker compose up -d qdrant
 ## Code map
 
 ```
-cmd/rag-hybrid/       CLI: serve / index / retrieve / ask
+cmd/rag-hybrid/       CLI: serve / index / retrieve / ask (composition root)
+internal/engine/      the core: ports (VectorStore, Embedder, Reranker, LLM),
+                      loading, chunking (400/50), index & query flows
+internal/qdrant/      adapter: REST client implementing engine.VectorStore
+internal/openrouter/  adapter: embeddings + rerank clients (Embedder, Reranker)
+internal/deepseek/    adapter: chat-completions client implementing engine.LLM
 internal/bm25/        unicode tokenizer + hashed sparse encoder (~110 lines)
-internal/openrouter/  embeddings + rerank HTTP clients
-internal/qdrant/      REST client: ensure / upsert / hybrid query (RRF) / drop
-internal/engine/      loading, chunking (400/50), index & query flows
 internal/server/      net/http API + web UI embedded via go:embed
 evals/                DeepEval harness + golden set (implementation-agnostic HTTP)
 ```
+
+Dependencies point inward (ports & adapters): the engine defines the
+interfaces it needs, the adapters implement them, and `cmd/` + `server.New`
+are the composition roots that wire concrete clients into the engine.
 
 ## Evaluating it yourself
 

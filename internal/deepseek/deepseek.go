@@ -1,4 +1,7 @@
-package engine
+// Package deepseek provides a minimal, stdlib-only client for the DeepSeek
+// chat-completions API (OpenAI-compatible dialect). It implements the
+// engine.LLM port; the engine itself never imports this package.
+package deepseek
 
 import (
 	"bufio"
@@ -12,21 +15,22 @@ import (
 	"time"
 )
 
-// DeepSeek generates the final answer. It speaks the OpenAI-compatible
-// chat-completions dialect against the official DeepSeek API.
-type DeepSeek struct {
+// Client generates the final answer. It speaks the OpenAI-compatible
+// chat-completions dialect against the official DeepSeek API and
+// satisfies the engine.LLM port.
+type Client struct {
 	APIKey  string
 	BaseURL string
 	Client  *http.Client
 }
 
-// NewDeepSeek builds a client with sane defaults (base URL and 120s
+// New builds a client with sane defaults (base URL and 120s
 // timeout; generation can take a while).
-func NewDeepSeek(apiKey, baseURL string) *DeepSeek {
+func New(apiKey, baseURL string) *Client {
 	if baseURL == "" {
 		baseURL = "https://api.deepseek.com/v1"
 	}
-	return &DeepSeek{APIKey: apiKey, BaseURL: baseURL, Client: &http.Client{Timeout: 120 * time.Second}}
+	return &Client{APIKey: apiKey, BaseURL: baseURL, Client: &http.Client{Timeout: 120 * time.Second}}
 }
 
 type chatRequest struct {
@@ -50,7 +54,7 @@ type chatResponse struct {
 }
 
 // Complete sends one user prompt and returns the generated text.
-func (d *DeepSeek) Complete(ctx context.Context, model, prompt string, maxTokens int) (string, error) {
+func (d *Client) Complete(ctx context.Context, model, prompt string, maxTokens int) (string, error) {
 	if d.APIKey == "" {
 		return "", fmt.Errorf("DEEPSEEK_API_KEY is not set: copy env.example to .env and add your key")
 	}
@@ -113,7 +117,7 @@ type chatStreamResponse struct {
 // the concatenation of all deltas is also returned when the stream ends
 // ("data: [DONE]"). If onDelta returns an error the stream is aborted and
 // that error is returned along with the text accumulated so far.
-func (d *DeepSeek) CompleteStream(ctx context.Context, model, prompt string, maxTokens int, onDelta func(string) error) (string, error) {
+func (d *Client) CompleteStream(ctx context.Context, model, prompt string, maxTokens int, onDelta func(string) error) (string, error) {
 	if d.APIKey == "" {
 		return "", fmt.Errorf("DEEPSEEK_API_KEY is not set: copy env.example to .env and add your key")
 	}

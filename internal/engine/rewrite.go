@@ -24,7 +24,7 @@ const rewriteTurnMaxChars = 400
 // The first question of a conversation (empty history) is returned
 // unchanged without calling the LLM (fast-path). The model is instructed
 // to rewrite only — never to answer and never to invent facts.
-func RewriteQuery(ctx context.Context, llm *DeepSeek, model string, history []Turn, question string) (string, error) {
+func RewriteQuery(ctx context.Context, llm LLM, model string, history []Turn, question string) (string, error) {
 	if len(history) == 0 {
 		return question, nil
 	}

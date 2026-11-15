@@ -11,8 +11,6 @@ import (
 
 	"rag-hybrid/internal/bm25"
 	"rag-hybrid/internal/config"
-	"rag-hybrid/internal/openrouter"
-	"rag-hybrid/internal/qdrant"
 )
 
 // MaxUploadBytes caps each uploaded file (10 MB, same as the Python UI).
@@ -38,21 +36,18 @@ type chunkRef struct {
 	source  string
 }
 
-// Indexer orchestrates: documents -> chunks -> dense embeddings (OpenRouter)
-// + BM25 sparse (local) -> Qdrant points.
+// Indexer orchestrates: documents -> chunks -> dense embeddings (Embedder
+// port) + BM25 sparse (local) -> VectorStore points.
 type Indexer struct {
-	cfg  *config.Config
-	open *openrouter.Client
-	qd   *qdrant.Client
+	cfg   *config.Config
+	embed Embedder
+	store VectorStore
 }
 
-// NewIndexer wires an Indexer from config.
-func NewIndexer(cfg *config.Config) *Indexer {
-	return &Indexer{
-		cfg:  cfg,
-		open: openrouter.NewClient(cfg.OpenRouterAPIKey, cfg.OpenRouterBaseURL),
-		qd:   qdrant.NewClient(cfg.QdrantURL, cfg.QdrantAPIKey, cfg.QdrantCollection),
-	}
+// NewIndexer wires an Indexer from its driven ports; the composition root
+// builds the concrete adapters.
+func NewIndexer(cfg *config.Config, store VectorStore, embed Embedder) *Indexer {
+	return &Indexer{cfg: cfg, embed: embed, store: store}
 }
 
 // IndexFiles loads path (file or directory, recursive) and indexes it.
@@ -127,18 +122,18 @@ func documentsToChunks(documents []Document, size, overlap int) []chunkRef {
 // collection first (dropping it when recreate is set).
 func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate bool) (IndexResult, error) {
 	if recreate {
-		if err := ix.qd.DropCollection(ctx); err != nil {
+		if err := ix.store.DropCollection(ctx); err != nil {
 			return IndexResult{}, fmt.Errorf("dropping collection: %w", err)
 		}
 	}
-	if err := ix.qd.EnsureCollection(ctx, ix.cfg.EmbedDim); err != nil {
+	if err := ix.store.EnsureCollection(ctx, ix.cfg.EmbedDim); err != nil {
 		return IndexResult{}, fmt.Errorf("ensuring collection: %w", err)
 	}
 	if !recreate {
 		// Sync per source (delete-then-insert): re-uploading a document
 		// replaces its chunks instead of duplicating them.
 		for _, source := range distinctSources(chunks) {
-			if err := ix.qd.DeleteBySource(ctx, source); err != nil {
+			if err := ix.store.DeleteBySource(ctx, source); err != nil {
 				return IndexResult{}, fmt.Errorf("syncing %s: %w", source, err)
 			}
 		}
@@ -153,7 +148,7 @@ func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate 
 		for i, c := range group {
 			texts[i] = c.content
 		}
-		embeddings, err := ix.open.EmbedTexts(ctx, ix.cfg.EmbedModel, texts)
+		embeddings, err := ix.embed.EmbedTexts(ctx, ix.cfg.EmbedModel, texts)
 		if err != nil {
 			return IndexResult{Chunks: written}, fmt.Errorf("embedding batch: %w", err)
 		}
@@ -161,7 +156,7 @@ func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate 
 			return IndexResult{Chunks: written}, fmt.Errorf("embedding batch size mismatch: got %d want %d", len(embeddings), len(group))
 		}
 
-		points := make([]qdrant.Point, len(group))
+		points := make([]Point, len(group))
 		for i, c := range group {
 			if len(embeddings[i]) != ix.cfg.EmbedDim {
 				return IndexResult{Chunks: written}, fmt.Errorf("embedding dimension mismatch: got %d want %d (EMBED_DIM?)", len(embeddings[i]), ix.cfg.EmbedDim)
@@ -171,7 +166,7 @@ func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate 
 			if err != nil {
 				return IndexResult{Chunks: written}, err
 			}
-			points[i] = qdrant.Point{
+			points[i] = Point{
 				ID:            id,
 				Dense:         embeddings[i],
 				SparseIndices: sparse.Indices,
@@ -180,7 +175,7 @@ func (ix *Indexer) writeChunks(ctx context.Context, chunks []chunkRef, recreate 
 				Source:        c.source,
 			}
 		}
-		if err := ix.qd.Upsert(ctx, points); err != nil {
+		if err := ix.store.Upsert(ctx, points); err != nil {
 			return IndexResult{Chunks: written}, fmt.Errorf("upserting batch: %w", err)
 		}
 		written += len(points)

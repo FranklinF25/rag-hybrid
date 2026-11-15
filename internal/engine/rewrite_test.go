@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"rag-hybrid/internal/deepseek"
 )
 
 // fakeRewriteServer answers a non-streaming chat completion with the given
@@ -36,7 +38,7 @@ func TestRewriteQueryNoHistorySkipsLLM(t *testing.T) {
 		t.Errorf("rewrite must not call the LLM for empty history, got %s %s", r.Method, r.URL.Path)
 	}))
 	t.Cleanup(server.Close)
-	llm := NewDeepSeek("test-key", server.URL)
+	llm := deepseek.New("test-key", server.URL)
 
 	question := "What is Kappa frequency?"
 	got, err := RewriteQuery(context.Background(), llm, "deepseek-chat", nil, question)
@@ -50,7 +52,7 @@ func TestRewriteQueryNoHistorySkipsLLM(t *testing.T) {
 
 func TestRewriteQueryWithHistory(t *testing.T) {
 	server, requestBody := fakeRewriteServer(t, `"  What is the top speed of the Swift?  "`)
-	llm := NewDeepSeek("test-key", server.URL)
+	llm := deepseek.New("test-key", server.URL)
 
 	history := []Turn{
 		{Role: "user", Content: "What is the fastest production car?"},
@@ -75,7 +77,11 @@ func TestRewriteQueryWithHistory(t *testing.T) {
 		}
 	}
 
-	var sent chatRequest
+	var sent struct {
+		Model     string `json:"model"`
+		MaxTokens int    `json:"max_tokens"`
+		Stream    bool   `json:"stream"`
+	}
 	if err := json.Unmarshal([]byte(*requestBody), &sent); err != nil {
 		t.Fatalf("decoding request body: %v", err)
 	}
@@ -86,7 +92,7 @@ func TestRewriteQueryWithHistory(t *testing.T) {
 
 func TestRewriteQueryEmptyResponseFallsBack(t *testing.T) {
 	server, _ := fakeRewriteServer(t, "")
-	llm := NewDeepSeek("test-key", server.URL)
+	llm := deepseek.New("test-key", server.URL)
 
 	question := "How does it compare to the Vue?"
 	history := []Turn{{Role: "user", Content: "Tell me about the Swift."}}

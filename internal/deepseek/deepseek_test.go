@@ -1,4 +1,4 @@
-package engine
+package deepseek
 
 import (
 	"context"
@@ -10,14 +10,19 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"rag-hybrid/internal/engine"
 )
 
+// Compile-time proof that the client satisfies the LLM port.
+var _ engine.LLM = (*Client)(nil)
+
 // newStreamTestServer spins up a fake DeepSeek API the client can talk to.
-func newStreamTestServer(t *testing.T, handler http.HandlerFunc) *DeepSeek {
+func newStreamTestServer(t *testing.T, handler http.HandlerFunc) *Client {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-	return NewDeepSeek("test-key", server.URL)
+	return New("test-key", server.URL)
 }
 
 func TestCompleteStreamDeltas(t *testing.T) {

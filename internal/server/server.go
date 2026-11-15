@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"rag-hybrid/internal/config"
+	"rag-hybrid/internal/deepseek"
 	"rag-hybrid/internal/engine"
+	"rag-hybrid/internal/openrouter"
 	"rag-hybrid/internal/qdrant"
 	"rag-hybrid/internal/store"
 )
@@ -23,16 +25,17 @@ var indexHTML []byte
 
 // Server holds the shared engine pieces behind the HTTP API.
 type Server struct {
-	cfg        *config.Config
-	searcher   *engine.Searcher
-	indexer    *engine.Indexer
-	client     *http.Client
-	collection string
-	convs      *store.Store
-	done       chan struct{}
+	cfg      *config.Config
+	searcher *engine.Searcher
+	indexer  *engine.Indexer
+	store    engine.VectorStore
+	convs    *store.Store
+	done     chan struct{}
 }
 
-// New builds the server (and its engine wiring) from config. It also opens
+// New builds the server: the driving adapter AND its composition root. It
+// constructs the driven adapters (qdrant vector store, OpenRouter embedder
+// + reranker, DeepSeek LLM), injects them into the engine use cases, opens
 // the SQLite conversation store and starts the retention loop; call Close
 // to release both.
 func New(cfg *config.Config) (*Server, error) {
@@ -40,14 +43,16 @@ func New(cfg *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening conversation store: %w", err)
 	}
+	vectorStore := qdrant.NewClient(cfg.QdrantURL, cfg.QdrantAPIKey, cfg.QdrantCollection)
+	open := openrouter.NewClient(cfg.OpenRouterAPIKey, cfg.OpenRouterBaseURL)
+	llm := deepseek.New(cfg.DeepSeekAPIKey, cfg.LLMBaseURL)
 	return &Server{
-		cfg:        cfg,
-		searcher:   engine.NewSearcher(cfg),
-		indexer:    engine.NewIndexer(cfg),
-		client:     &http.Client{Timeout: 2 * time.Second},
-		collection: cfg.QdrantCollection,
-		convs:      convStore,
-		done:       done,
+		cfg:      cfg,
+		searcher: engine.NewSearcher(cfg, vectorStore, open, open, llm),
+		indexer:  engine.NewIndexer(cfg, vectorStore, open),
+		store:    vectorStore,
+		convs:    convStore,
+		done:     done,
 	}, nil
 }
 
@@ -110,29 +115,18 @@ func (s *Server) handleIndex(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(indexHTML)
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
 	health := map[string]any{
 		"qdrant":     false,
 		"points":     nil,
 		"key":        s.cfg.DeepSeekAPIKey != "",
 		"openrouter": s.cfg.OpenRouterAPIKey != "",
 	}
-	url := strings.TrimRight(s.cfg.QdrantURL, "/") + "/collections/" + s.collection
-	resp, err := s.client.Get(url)
-	if err == nil {
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		if resp.StatusCode == http.StatusOK {
-			var parsed struct {
-				Result struct {
-					PointsCount int `json:"points_count"`
-				} `json:"result"`
-			}
-			if json.Unmarshal(body, &parsed) == nil {
-				health["qdrant"] = true
-				health["points"] = parsed.Result.PointsCount
-			}
-		}
+	if points, err := s.store.PointsCount(ctx); err == nil {
+		health["qdrant"] = true
+		health["points"] = points
 	}
 	writeJSON(w, http.StatusOK, health)
 }
@@ -277,8 +271,7 @@ func (s *Server) handleDocuments(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	client := qdrant.NewClient(s.cfg.QdrantURL, s.cfg.QdrantAPIKey, s.cfg.QdrantCollection)
-	stats, err := client.ListSources(ctx)
+	stats, err := s.store.ListSources(ctx)
 	if err != nil {
 		writeErr(w, http.StatusServiceUnavailable, err.Error())
 		return
@@ -299,8 +292,7 @@ func (s *Server) handleForget(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	client := qdrant.NewClient(s.cfg.QdrantURL, s.cfg.QdrantAPIKey, s.cfg.QdrantCollection)
-	if err := client.DeleteBySource(ctx, source); err != nil {
+	if err := s.store.DeleteBySource(ctx, source); err != nil {
 		writeErr(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}

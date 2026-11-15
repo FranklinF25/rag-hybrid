@@ -3,7 +3,8 @@
 // vectors) and server-side RRF queries. It mirrors the collection layout of
 // the Python store in src/rag_hybrid/store.py: a "text-dense" cosine vector
 // space plus a "text-sparse" space with the IDF modifier applied at query
-// time by the server.
+// time by the server. The client implements the engine.VectorStore port;
+// engine defines the types it exchanges.
 package qdrant
 
 import (
@@ -16,6 +17,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"rag-hybrid/internal/engine"
 )
 
 // defaultBaseURL is the Qdrant REST root used when NewClient gets "".
@@ -34,7 +37,8 @@ const (
 	sparseVectorName = "text-sparse"
 )
 
-// Client talks to a single Qdrant collection. It is safe for concurrent use.
+// Client talks to a single Qdrant collection. It is safe for concurrent use
+// and satisfies the engine.VectorStore port.
 type Client struct {
 	baseURL    string
 	apiKey     string
@@ -57,24 +61,15 @@ func NewClient(baseURL, apiKey, collection string) *Client {
 	}
 }
 
-// Point is one document chunk ready for a hybrid upsert: a dense embedding,
-// a sparse (BM25-style) vector and the payload fields stored alongside them.
-type Point struct {
-	ID            string
-	Dense         []float64
-	SparseIndices []uint32
-	SparseValues  []float64
-	Content       string
-	Source        string
-}
+// Compile-time proof that the client satisfies the VectorStore port.
+var _ engine.VectorStore = (*Client)(nil)
+
+// Point is one document chunk ready for a hybrid upsert. Alias of the
+// domain type so callers of this package rarely need to import engine.
+type Point = engine.Point
 
 // Hit is one row of a hybrid query result.
-type Hit struct {
-	ID      string
-	Score   float64
-	Content string
-	Source  string
-}
+type Hit = engine.Hit
 
 // vectorParams is the config of one named dense vector space.
 type vectorParams struct {
@@ -335,6 +330,26 @@ func parsePointID(raw json.RawMessage) string {
 	return string(raw)
 }
 
+func (c *Client) PointsCount(ctx context.Context) (int, error) {
+	path := "/collections/" + c.collection
+	status, body, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return 0, err
+	}
+	if err := c.statusError(http.MethodGet, path, status, body); err != nil {
+		return 0, err
+	}
+	var parsed struct {
+		Result struct {
+			PointsCount int `json:"points_count"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return 0, fmt.Errorf("qdrant GET %s: decoding response: %w", path, err)
+	}
+	return parsed.Result.PointsCount, nil
+}
+
 // DeleteBySource removes every point whose payload "source" matches the
 // given value (used for document sync: delete-then-insert keeps uploads
 // idempotent). A no-op when nothing matches.
@@ -358,10 +373,7 @@ func (c *Client) DeleteBySource(ctx context.Context, source string) error {
 }
 
 // SourceStat aggregates the chunk count of one indexed source file.
-type SourceStat struct {
-	Source string `json:"source"`
-	Chunks int    `json:"chunks"`
-}
+type SourceStat = engine.SourceStat
 
 // ListSources returns every distinct payload source with its chunk count,
 // ordered by chunks descending (scrolls sources only, no vectors).

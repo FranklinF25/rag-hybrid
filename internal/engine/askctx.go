@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"rag-hybrid/internal/qdrant"
 )
 
 // PrepareQuery is stage one of a conversational answer: rewrite the
@@ -18,7 +16,7 @@ import (
 // non-empty localAnswer when the system can answer deterministically
 // without generation (nothing retrieved or below threshold). Callers either
 // show localAnswer directly or continue with Generate/GenerateStream.
-func (s *Searcher) PrepareQuery(ctx context.Context, question string, history []Turn) (string, []qdrant.Hit, string, error) {
+func (s *Searcher) PrepareQuery(ctx context.Context, question string, history []Turn) (string, []Hit, string, error) {
 	rewritten, err := RewriteQuery(ctx, s.llm, s.cfg.LLMModel, history, question)
 	if err != nil {
 		return "", nil, "", fmt.Errorf("rewriting: %w", err)
@@ -43,12 +41,12 @@ func (s *Searcher) PrepareQuery(ctx context.Context, question string, history []
 
 // Generate is stage two (non-streaming): produce the grounded answer for
 // the ORIGINAL question with the recent history for coherence.
-func (s *Searcher) Generate(ctx context.Context, question string, history []Turn, hits []qdrant.Hit) (string, error) {
+func (s *Searcher) Generate(ctx context.Context, question string, history []Turn, hits []Hit) (string, error) {
 	return s.llm.Complete(ctx, s.cfg.LLMModel, buildContextualPrompt(question, history, hits), s.cfg.GenerationMaxTokens)
 }
 
 // GenerateStream is stage two (streaming): same prompt, deltas via onDelta.
-func (s *Searcher) GenerateStream(ctx context.Context, question string, history []Turn, hits []qdrant.Hit, onDelta func(string) error) (string, error) {
+func (s *Searcher) GenerateStream(ctx context.Context, question string, history []Turn, hits []Hit, onDelta func(string) error) (string, error) {
 	return s.llm.CompleteStream(ctx, s.cfg.LLMModel, buildContextualPrompt(question, history, hits), s.cfg.GenerationMaxTokens, onDelta)
 }
 
@@ -73,7 +71,7 @@ func (s *Searcher) AskWithContext(ctx context.Context, question string, history 
 // buildContextualPrompt renders the grounded prompt with the recent
 // conversation as a preamble, then the numbered documents, then the
 // question. History turns are truncated to keep the prompt lean.
-func buildContextualPrompt(question string, history []Turn, hits []qdrant.Hit) string {
+func buildContextualPrompt(question string, history []Turn, hits []Hit) string {
 	var b strings.Builder
 	if len(history) > 0 {
 		b.WriteString("Recent conversation (for context only):\n")

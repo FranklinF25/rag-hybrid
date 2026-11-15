@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"rag-hybrid/internal/config"
+	"rag-hybrid/internal/deepseek"
 	"rag-hybrid/internal/engine"
+	"rag-hybrid/internal/openrouter"
+	"rag-hybrid/internal/qdrant"
 	"rag-hybrid/internal/server"
 )
 
@@ -66,6 +69,20 @@ func fatalf(format string, args ...any) {
 	os.Exit(1)
 }
 
+// newIndexer is the CLI composition root for indexing: it builds the
+// concrete driven adapters and injects them into the engine.
+func newIndexer(cfg *config.Config) *engine.Indexer {
+	vectorStore := qdrant.NewClient(cfg.QdrantURL, cfg.QdrantAPIKey, cfg.QdrantCollection)
+	return engine.NewIndexer(cfg, vectorStore, openrouter.NewClient(cfg.OpenRouterAPIKey, cfg.OpenRouterBaseURL))
+}
+
+// newSearcher is the CLI composition root for the query side.
+func newSearcher(cfg *config.Config) *engine.Searcher {
+	vectorStore := qdrant.NewClient(cfg.QdrantURL, cfg.QdrantAPIKey, cfg.QdrantCollection)
+	open := openrouter.NewClient(cfg.OpenRouterAPIKey, cfg.OpenRouterBaseURL)
+	return engine.NewSearcher(cfg, vectorStore, open, open, deepseek.New(cfg.DeepSeekAPIKey, cfg.LLMBaseURL))
+}
+
 func cmdServe(args []string) {
 	flags := flag.NewFlagSet("serve", flag.ExitOnError)
 	host := flags.String("host", "", "listen host (default WEB_HOST)")
@@ -113,7 +130,7 @@ func cmdIndex(args []string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	result, err := engine.NewIndexer(cfg).IndexFiles(ctx, positional[0], *recreate)
+	result, err := newIndexer(cfg).IndexFiles(ctx, positional[0], *recreate)
 	if err != nil {
 		fatalf("index: %v", err)
 	}
@@ -131,7 +148,7 @@ func cmdRetrieve(args []string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	hits, err := engine.NewSearcher(cfg).Retrieve(ctx, question)
+	hits, err := newSearcher(cfg).Retrieve(ctx, question)
 	if err != nil {
 		fatalf("retrieve: %v", err)
 	}
@@ -159,7 +176,7 @@ func cmdAsk(args []string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	answer, err := engine.NewSearcher(cfg).Ask(ctx, question)
+	answer, err := newSearcher(cfg).Ask(ctx, question)
 	if err != nil {
 		fatalf("ask: %v", err)
 	}

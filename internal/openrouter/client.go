@@ -2,6 +2,7 @@
 // OpenRouter API: the OpenAI-compatible /embeddings endpoint and the
 // /rerank endpoint. The client is stateless apart from one shared
 // http.Client, mirroring the Python reference in src/rag_hybrid/openrouter.py.
+// It implements the engine.Embedder and engine.Reranker ports.
 package openrouter
 
 import (
@@ -14,6 +15,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"rag-hybrid/internal/engine"
 )
 
 // DefaultBaseURL is the OpenRouter API root used when NewClient gets "".
@@ -25,7 +28,8 @@ const defaultTimeout = 60 * time.Second
 // errorSnippetLen caps the response-body excerpt included in error messages.
 const errorSnippetLen = 200
 
-// Client talks to OpenRouter. It is safe for concurrent use.
+// Client talks to OpenRouter. It is safe for concurrent use and satisfies
+// the engine.Embedder and engine.Reranker ports.
 type Client struct {
 	apiKey  string
 	baseURL string
@@ -45,12 +49,16 @@ func NewClient(apiKey, baseURL string) *Client {
 	}
 }
 
-// ScoredDoc is one rerank result: Index points into the documents slice that
-// was passed to Rerank; Score is the cross-encoder relevance score.
-type ScoredDoc struct {
-	Index int
-	Score float64
-}
+// Compile-time proof that the client satisfies both ports.
+var (
+	_ engine.Embedder = (*Client)(nil)
+	_ engine.Reranker = (*Client)(nil)
+)
+
+// ScoredDoc is one rerank result. Alias of the domain type: Index points
+// into the documents slice that was passed to Rerank; Score is the
+// cross-encoder relevance score.
+type ScoredDoc = engine.ScoredDoc
 
 type embeddingsRequest struct {
 	Model          string   `json:"model"`

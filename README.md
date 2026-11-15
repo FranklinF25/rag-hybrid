@@ -118,6 +118,13 @@ fly deploy
 Qdrant Cloud has a free 1 GB tier — or keep Qdrant local and deploy only
 the binary with a public tunnel.
 
+On SIGTERM or SIGINT (Ctrl+C, `docker stop`, platform deploys) the server
+stops accepting connections and drains in-flight requests — SSE
+generations included — for up to 10 s before force-closing whatever is
+still open and shutting SQLite cleanly (exit 0). compose raises
+`stop_grace_period` to 20 s so the drain always wins the race against
+SIGKILL.
+
 ## Document lifecycle
 
 - **Idempotent uploads**: indexing a file first removes its previous chunks

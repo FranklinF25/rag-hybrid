@@ -23,6 +23,10 @@ services:
     container_name: rag-hybrid-webapp
     depends_on:
       - qdrant
+    # SIGTERM (docker stop) triggers a graceful drain of in-flight requests
+    # (up to 10s); the grace period must exceed that drain window so the
+    # process always finishes closing SQLite before any SIGKILL.
+    stop_grace_period: 20s
     ports:
       # Host-side loopback only: the UI stays off the LAN.
       - "127.0.0.1:8000:8000"

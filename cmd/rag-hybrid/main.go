@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"rag-hybrid/internal/config"
@@ -83,6 +87,11 @@ func newSearcher(cfg *config.Config) *engine.Searcher {
 	return engine.NewSearcher(cfg, vectorStore, open, open, deepseek.New(cfg.DeepSeekAPIKey, cfg.LLMBaseURL))
 }
 
+// drainTimeout bounds how long shutdown waits for in-flight requests (SSE
+// generations included) before force-closing their connections. Keep it
+// below the docker stop grace period (compose sets stop_grace_period).
+var drainTimeout = 10 * time.Second
+
 func cmdServe(args []string) {
 	flags := flag.NewFlagSet("serve", flag.ExitOnError)
 	host := flags.String("host", "", "listen host (default WEB_HOST)")
@@ -100,20 +109,62 @@ func cmdServe(args []string) {
 		cfg.WebPort = *port
 	}
 	addr := fmt.Sprintf("%s:%d", cfg.WebHost, cfg.WebPort)
-	fmt.Printf("rag-hybrid serving on http://%s\n", addr)
+	// Bind before opening the store: a busy port fails fast, with nothing
+	// to clean up.
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		fatalf("listen: %v", err)
+	}
+	fmt.Printf("rag-hybrid serving on http://%s\n", ln.Addr())
+
+	// SIGINT (Ctrl+C) and SIGTERM (docker stop) trigger the graceful drain.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := runServer(ctx, cfg, ln); err != nil {
+		fatalf("%v", err)
+	}
+}
+
+// runServer serves the web UI until ctx is cancelled or the listener
+// fails. On cancellation it stops accepting connections, waits up to
+// drainTimeout for in-flight requests to finish, force-closes whatever
+// is still open past the deadline, and only then releases the app
+// resources (retention loop, SQLite store). Serve returns ErrServerClosed
+// as soon as the listeners close, BEFORE draining finishes, so the
+// <-drained wait is what actually orders store.Close after the last
+// handler. app.Close is called exactly once on either path.
+func runServer(ctx context.Context, cfg *config.Config, ln net.Listener) error {
 	app, err := server.New(cfg)
 	if err != nil {
-		fatalf("server: %v", err)
+		return fmt.Errorf("server: %w", err)
 	}
-	defer app.Close()
 	srv := &http.Server{
-		Addr:              addr,
 		Handler:           app.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	if err := srv.ListenAndServe(); err != nil {
-		fatalf("server: %v", err)
+
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		<-ctx.Done()
+		fmt.Println("shutdown: signal received, draining in-flight requests")
+		drainCtx, cancel := context.WithTimeout(context.Background(), drainTimeout)
+		defer cancel()
+		if err := srv.Shutdown(drainCtx); err != nil {
+			fmt.Printf("shutdown: drain deadline exceeded, forcing close: %v\n", err)
+			_ = srv.Close()
+		}
+	}()
+
+	err = srv.Serve(ln)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		app.Close() // never served: release the store before failing
+		return fmt.Errorf("server: %w", err)
 	}
+	<-drained
+	app.Close()
+	fmt.Println("shutdown: complete (connections drained, store closed)")
+	return nil
 }
 
 func cmdIndex(args []string) {

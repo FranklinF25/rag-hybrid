@@ -83,15 +83,33 @@ docker compose up -d qdrant
 ## Code map
 
 ```
-cmd/rag-hybrid/       CLI: serve / index / retrieve / ask / forget (composition root)
-internal/engine/      the core: ports (VectorStore, Embedder, Reranker, LLM),
-                      loading, chunking (400/50), index & query flows
-internal/qdrant/      adapter: REST client implementing engine.VectorStore
-internal/openrouter/  adapter: embeddings + rerank clients (Embedder, Reranker)
-internal/deepseek/    adapter: chat-completions client implementing engine.LLM
-internal/bm25/        unicode tokenizer + hashed sparse encoder (~110 lines)
-internal/server/      net/http API + web UI embedded via go:embed
-evals/                DeepEval harness + golden set (implementation-agnostic HTTP)
+              ┌──────────────────┐    ┌───────────────────────────┐
+              │ internal/server  │    │ cmd/rag-hybrid            │
+              │ HTTP API + UI    │    │ serve · index · retrieve  │
+              │ driving adapter  │    │ ask · forget              │
+              └────────┬─────────┘    └─────────────┬─────────────┘
+                       └────────────┐  ┌───────────┘
+                                  │ calls
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ internal/engine — THE CORE                                               │
+│                                                                          │
+│   document loading · chunking (400/50) · index & query flows             │
+│   rewrite → hybrid retrieve → rerank → generate (SSE)                    │
+│                         │ defines                                        │
+│                         ▼                                                │
+│   PORTS: VectorStore · Embedder · Reranker · LLM  (Go interfaces)        │
+└────────────────▲──────────────────▲──────────────────▲───────────────────┘
+                 │                   │                  │
+                 │ implements        │ implements       │ implements
+              ┌──┴────────────┐   ┌──┴─────────────┐  ┌──┴──────────────┐
+              │ internal/     │   │ internal/      │  │ internal/       │
+              │ qdrant        │   │ openrouter     │  │ deepseek        │
+              │ hybrid + RRF  │   │ embeds · rerank│  │ chat · SSE      │
+              └───────────────┘   └────────────────┘  └─────────────────┘
+
+   internal/bm25 — unicode tokenizer            (used by the core directly)
+   evals/ — DeepEval golden set                 (black-box HTTP, no imports)
 ```
 
 Dependencies point inward (ports & adapters): the engine defines the

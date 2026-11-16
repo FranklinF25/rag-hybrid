@@ -1,5 +1,7 @@
 # rag-hybrid
 
+**English** · [Español](README.es.md)
+
 **Hybrid RAG you can hold in one hand**: a single 11 MB Go binary that chats
 with your documents using dense **Qwen3-Embedding-8B** + local **BM25**,
 server-side **RRF** fusion, **rerank-3-lite** and grounded answers from

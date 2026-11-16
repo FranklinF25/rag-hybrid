@@ -81,7 +81,7 @@ docker compose up -d qdrant
 ## Code map
 
 ```
-cmd/rag-hybrid/       CLI: serve / index / retrieve / ask (composition root)
+cmd/rag-hybrid/       CLI: serve / index / retrieve / ask / forget (composition root)
 internal/engine/      the core: ports (VectorStore, Embedder, Reranker, LLM),
                       loading, chunking (400/50), index & query flows
 internal/qdrant/      adapter: REST client implementing engine.VectorStore
@@ -151,10 +151,12 @@ compliance feature, consistent with document `forget`.
 - PDFs are supported via a text-layer extractor (pure Go, no cgo): text
   PDFs index normally; scanned/image-only PDFs are skipped with a clear
   reason (OCR is not supported).
-- PDFs are supported via a text-layer extractor (pure Go, no cgo): text PDFs index normally; scanned/image-only PDFs are skipped with a clear reason (OCR is not supported).
-
 - Qdrant pinned to `v1.14.1` (compose); the hybrid query uses REST prefetch
   legs + `{"fusion":"rrf"}`.
 - The BM25 sparse encoder was rewritten for Go (unicode tokenizer for
   Spanish); the collection was rebuilt from scratch — no legacy vectors.
 - Python implementation preserved in git history on `feat/v1-scaffold`.
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).

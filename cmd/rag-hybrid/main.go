@@ -35,6 +35,8 @@ func main() {
 		cmdRetrieve(os.Args[2:])
 	case "ask":
 		cmdAsk(os.Args[2:])
+	case "forget":
+		cmdForget(os.Args[2:])
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -71,6 +73,27 @@ commands:
 func fatalf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
+}
+
+// cmdForget removes every chunk indexed from one source file. The
+// argument must match the indexed payload source exactly (as listed by
+// GET /api/documents or the UI document list).
+func cmdForget(args []string) {
+	source := strings.TrimSpace(strings.Join(args, " "))
+	if source == "" {
+		fatalf("usage: rag-hybrid forget <source>")
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		fatalf("config: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	vs := qdrant.NewClient(cfg.QdrantURL, cfg.QdrantAPIKey, cfg.QdrantCollection)
+	if err := vs.DeleteBySource(ctx, source); err != nil {
+		fatalf("forget: %v", err)
+	}
+	fmt.Printf("Forgot %q: every chunk indexed from it is gone\n", source)
 }
 
 // newIndexer is the CLI composition root for indexing: it builds the

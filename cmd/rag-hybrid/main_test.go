@@ -124,6 +124,53 @@ func TestRunServerDrainsInFlightRequests(t *testing.T) {
 	}
 }
 
+// TestCmdForgetDeletesBySource runs the forget CLI command against a
+// fake qdrant and asserts the delete-by-source filter it sends. The
+// source must reach the store exactly as given (it must match the indexed
+// payload source).
+func TestCmdForgetDeletesBySource(t *testing.T) {
+	var gotMethod, gotPath, gotBody string
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		payload, _ := io.ReadAll(r.Body)
+		gotMethod, gotPath = r.Method, r.URL.Path
+		gotBody = string(payload)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{}, "status": "ok"})
+	}))
+	t.Cleanup(fake.Close)
+
+	t.Setenv("QDRANT_URL", fake.URL)
+	t.Setenv("QDRANT_COLLECTION", "test-collection")
+	t.Setenv("DATA_DIR", t.TempDir())
+	t.Setenv("OPENROUTER_API_KEY", "test-key")
+	t.Setenv("DEEPSEEK_API_KEY", "test-key")
+
+	cmdForget([]string{"sample/overview.md"})
+
+	if gotMethod != http.MethodPost || gotPath != "/collections/test-collection/points/delete" {
+		t.Fatalf("qdrant got %s %s, want POST /collections/test-collection/points/delete", gotMethod, gotPath)
+	}
+	var sent struct {
+		Filter struct {
+			Must []map[string]any `json:"must"`
+		} `json:"filter"`
+	}
+	if err := json.Unmarshal([]byte(gotBody), &sent); err != nil {
+		t.Fatalf("decoding delete body %q: %v", gotBody, err)
+	}
+	if len(sent.Filter.Must) != 1 {
+		t.Fatalf("delete body = %q, want exactly one must clause", gotBody)
+	}
+	clause := sent.Filter.Must[0]
+	if clause["key"] != "source" {
+		t.Fatalf("filter key = %v, want source", clause["key"])
+	}
+	match, ok := clause["match"].(map[string]any)
+	if !ok || match["value"] != "sample/overview.md" {
+		t.Fatalf("filter match = %v, want the source file as value", clause["match"])
+	}
+}
+
 // When the drain deadline is smaller than the in-flight request, shutdown
 // force-closes the connection: the request fails, but the server still
 // returns nil (it shut down, deterministically).

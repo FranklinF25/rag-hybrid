@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:" && echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      # ubuntu-latest ships a C toolchain, so the race detector runs here
+      # even where local dev boxes cannot (CGO_ENABLED=0 without gcc).
+      # All tests are hermetic: external-service tests skip themselves
+      # (qdrant integration probes localhost:6333 and skips when absent).
+      - name: Test (race)
+        run: go test -race ./...

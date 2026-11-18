@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -114,5 +115,83 @@ func TestCompleteStreamErrorStatus(t *testing.T) {
 	}
 	if text != "" {
 		t.Errorf("text = %q, want empty", text)
+	}
+}
+
+func TestCompleteLogsCacheUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"message":{"content":"hi there"}}],"usage":{"prompt_cache_hit_tokens":120,"prompt_cache_miss_tokens":340,"total_tokens":460}}`)
+	}))
+	t.Cleanup(server.Close)
+	llm := New("test-key", server.URL)
+
+	var logs []string
+	llm.Log = func(format string, args ...any) {
+		logs = append(logs, fmt.Sprintf(format, args...))
+	}
+
+	text, err := llm.Complete(context.Background(), "deepseek-chat", "say hi", 64)
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if text != "hi there" {
+		t.Errorf("text = %q, want %q", text, "hi there")
+	}
+	if len(logs) != 1 {
+		t.Fatalf("log lines = %d (%q), want exactly one line", len(logs), logs)
+	}
+	for _, want := range []string{"deepseek-chat", "cache_hit=120", "cache_miss=340"} {
+		if !strings.Contains(logs[0], want) {
+			t.Errorf("log line %q missing %q", logs[0], want)
+		}
+	}
+}
+
+func TestCompleteStreamRequestsUsageAndLogsIt(t *testing.T) {
+	llm := newStreamTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		if !strings.Contains(string(raw), `"stream_options":{"include_usage":true}`) {
+			t.Errorf("request body %s missing stream_options include_usage", raw)
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		frames := []string{
+			`data: {"choices":[{"delta":{"content":"Hel"}}]}`,
+			`data: {"choices":[{"delta":{"content":"lo"}}]}`,
+			// DeepSeek sends usage only in the final chunk, with an empty choices array.
+			`data: {"choices":[],"usage":{"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":500,"total_tokens":500}}`,
+			`data: [DONE]`,
+		}
+		for _, frame := range frames {
+			fmt.Fprintf(w, "%s\n\n", frame)
+		}
+	})
+
+	var logs []string
+	llm.Log = func(format string, args ...any) {
+		logs = append(logs, fmt.Sprintf(format, args...))
+	}
+
+	text, err := llm.CompleteStream(context.Background(), "deepseek-chat", "say hi", 64, func(string) error {
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("CompleteStream: %v", err)
+	}
+	if text != "Hello" {
+		t.Errorf("text = %q, want %q", text, "Hello")
+	}
+	if len(logs) != 1 {
+		t.Fatalf("log lines = %d (%q), want exactly one line", len(logs), logs)
+	}
+	for _, want := range []string{"deepseek-chat", "cache_hit=0", "cache_miss=500"} {
+		if !strings.Contains(logs[0], want) {
+			t.Errorf("log line %q missing %q", logs[0], want)
+		}
 	}
 }

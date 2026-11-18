@@ -1,7 +1,7 @@
 question,expected_answer
 "What does RRF stand for and how does it fuse the two ranked lists?","Reciprocal Rank Fusion. Each document earns a contribution of 1 / (k + rank) from every list it appears in, where k is a damping constant typically 60, and a document ranked high in both lists accumulates the most score."
 "What is the typical damping constant k used in RRF?","60"
-"Which models run on the local CPU in rag-hybrid?","BGE-M3 for dense embeddings and BGE-reranker-v2-m3 for reranking run on the local CPU; Qdrant runs locally in Docker and the generation LLM is called via API."
+"Which embedding and reranking models does rag-hybrid call via API, and what runs locally instead?","Qwen3-Embedding-8B for dense embeddings and rerank-3-lite for reranking, both called through the OpenRouter API; the BM25 sparse encoder runs locally in Go and the RRF fusion happens inside Qdrant."
 "How many candidates are retrieved with hybrid search before reranking, and how many survive into the final prompt?","Twenty candidates are retrieved with hybrid search and only the best five documents survive into the final prompt."
 "Why are cross-encoders more accurate than bi-encoders?","Because attention flows across the query-document pair since the cross-encoder reads the query and the candidate text together, at the cost of scoring one pair at a time."
-"Which LLM generates the final answer in rag-hybrid and which framework orchestrates the pipeline?","DeepSeek (model deepseek-chat) generates the final answer and Haystack 2.x orchestrates the pipeline."
+"Which LLM generates the final answer in rag-hybrid and what orchestrates the pipeline?","DeepSeek (model deepseek-chat) generates the final answer and the pipeline is orchestrated by hand-written Go on the standard library only — no framework."

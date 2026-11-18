@@ -1,19 +1,23 @@
 # rag-hybrid overview
 
 rag-hybrid is a semi-local Retrieval-Augmented Generation (RAG) service.
-The retrieval stack runs entirely on the local CPU: Qdrant as the vector
-database, BGE-M3 for dense embeddings, BM25 for sparse keyword retrieval,
-Reciprocal Rank Fusion (RRF) to combine both result lists, and the
-BGE-reranker-v2-m3 cross-encoder to rerank the fused candidates. The final
-generation step calls the DeepSeek API (model deepseek-chat), which is
+The retrieval stack pairs a hand-written Go BM25 sparse encoder with dense
+embeddings from the Qwen3-Embedding-8B model (called through the
+OpenRouter API), fuses both result lists with Reciprocal Rank Fusion (RRF)
+executed inside Qdrant, and reranks the fused candidates with the
+rerank-3-lite cross-encoder, also through OpenRouter. The final generation
+step calls the DeepSeek API (model deepseek-chat), which is
 OpenAI-compatible.
 
-The project targets an 8 GB RAM machine. Embedding and reranking models run
-in CPU mode, and Qdrant runs in Docker with its storage bind-mounted inside
-the repository folder so the host machine stays clean.
+The service ships as one static Go binary (11 MB scratch image) with the
+web UI embedded. Qdrant runs in Docker with its storage bind-mounted
+inside the repository folder so the host machine stays clean; embedding,
+reranking and generation are API calls, so no ML runtime runs locally.
 
-The orchestration framework is Haystack 2.x. Indexing flows through a
-document splitter, a dense document embedder and a sparse document embedder
-into a Qdrant document writer. Query time runs hybrid retrieval, fuses the
-dense and sparse rankings with RRF, reranks with the cross-encoder, renders
-a prompt with the top documents and asks the LLM for a grounded answer.
+There is no orchestration framework: the pipeline is hand-written Go on
+the standard library only, organized as ports and adapters. Indexing
+flows through a chunker, the dense embedding API and the local BM25
+encoder into Qdrant's hybrid (dense + sparse) collection. Query time runs
+hybrid retrieval, fuses the dense and sparse rankings with server-side
+RRF, reranks with rerank-3-lite, renders a prompt with the top documents
+and asks the LLM for a grounded answer.

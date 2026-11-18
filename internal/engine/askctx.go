@@ -73,6 +73,14 @@ func (s *Searcher) AskWithContext(ctx context.Context, question string, history 
 // question. History turns are truncated to keep the prompt lean.
 func buildContextualPrompt(question string, history []Turn, hits []Hit) string {
 	var b strings.Builder
+	// Cache-friendly order: stable material first (static instructions,
+	// then the append-only history) so consecutive turns of one
+	// conversation share a growing prompt prefix — DeepSeek's automatic
+	// context cache matches it in 64-token blocks. Per-turn material
+	// (retrieved documents, question) goes last.
+	b.WriteString("Answer the question using only the documents below.\n")
+	b.WriteString("If the documents do not contain the answer, say you don't know.\n")
+	b.WriteString("Cite the documents you use like [1], [2].\n\n")
 	if len(history) > 0 {
 		b.WriteString("Recent conversation (for context only):\n")
 		for _, turn := range history {
@@ -80,9 +88,6 @@ func buildContextualPrompt(question string, history []Turn, hits []Hit) string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("Answer the question using only the documents below.\n")
-	b.WriteString("If the documents do not contain the answer, say you don't know.\n")
-	b.WriteString("Cite the documents you use like [1], [2].\n\n")
 	for i, hit := range hits {
 		fmt.Fprintf(&b, "[%d] %s\n\n", i+1, hit.Content)
 	}
